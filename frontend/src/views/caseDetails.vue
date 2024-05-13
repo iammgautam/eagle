@@ -84,8 +84,8 @@
 
 </template>
 
-<!-- <script lang="ts">
-// import router from '@/router';
+<script lang="ts">
+import router from '@/router';
 import { defineComponent, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCaseDetailsStore } from '@/stores/CaseDetailsStore';
@@ -131,7 +131,7 @@ export default defineComponent({
 
 
                     // Navigate to SelectCategory
-                    // router.push('/select-category');
+                    router.push('/select-category');
                 }
             }
         };
@@ -146,7 +146,7 @@ export default defineComponent({
         };
     }
 });
-</script> -->
+</script>
 
 <style scoped>
 .logo {
