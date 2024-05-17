@@ -12,10 +12,11 @@ class CaseHistorySerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "petitioner_name",
-            "respodent_name",
-            "legal_isse",
+            "respondent_name",
+            "legal_issue",
             "fact_case",
             "brief_argument",
+            "submit_type",
             "created_date",
             "modified_date",
         ]
