@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <br>
+    Left:{{ count }}
+    {% if case_history %}
+    <a href="{% url 'brief_argument:research_input' case_history.id %}">{{ case_history.petitioner_name }} vs {{
+        case_history.respondent_name }} in {{ case_history.high_court }}</a>
+    {% else %}
+    <p>No case history found.</p>
+    {% endif %}
+</body>
+
+</html>

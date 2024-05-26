@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("api/brief_arguments/", include("brief_argument.urls")),
-    path("api/case_history/", include("case_history.urls")),
-]
+    path("", include("brief_argument.urls", namespace='brief_argument')),
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brief Argument by Syndicus</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            width: full;
+            padding: 20px;
+        }
+        .heading {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .subheading {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .paragraph {
+            font-size: 14px;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+        .separator {
+            border-top: 1px solid #000;
+            margin: 20px 0;
+        }
+        .list-item {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="heading">{{brief_argument.case_history.legal_issue}}</div>
+
+        <!-- <div class="heading">Argument Title</div> -->
+        <div class="heading">{{brief_argument.title}}</div>
+        <div class="paragraph">{{brief_argument.introduction}}</div>
+        <br>
+        {% for sub_argument in brief_argument.argument_value.all %}
+        <br>
+        <div class="subheading">{{sub_argument.title}}</div>
+        <br>
+        <div class="paragraph">{{sub_argument.content|safe}}</div>
+        {% endfor %}
+        <br/>
+        <br><br>
+        <!-- <div class="heading">Conclusion</div> -->
+        <div class="paragraph">{{brief_argument.conclusion|safe}}</div>
+        <br>
+        <div class="separator"></div>
+        <div class="separator"></div>
+        <br>
+        <div class="subheading">Prayer</div>
+        <div class="paragraph">{{ brief_argument.prayer|safe }}</div>
+        <br>
+        <div class="separator"></div>
+        <div class="separator"></div>
+        <br>
+        <div class="subheading">Legal Research</div>
+        <ul>
+            {% for topics in relevent_topics %}
+            <li class="list-item">{{ topics.name }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

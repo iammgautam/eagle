@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width='device-width', initial-scale=1.0">
+    <title>Brief Legal Counsel</title>
+</head>
+
+<body>
+    <div id="app">
+        <h1>Chat 2</h1>
+        <!-- <label for="system_instruction">SYSTEM INSTRUCTION:</label> -->
+        <!-- <input type="text" id="system_instruction" name="system_instruction" value="{{ system_instruction }}"
+            ref="system_instruction" readonly>
+        <button @click="copyText('system_instruction')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="law_topics">Topics:</label>
+        <input type="text" id="law_topics" name="law_topics" value="{{ law_topics }}" ref="law_topics" readonly>
+        <button @click="copyText('law_topics')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="fact_value">FACT:</label>
+        <input type="text" id="fact_value" name="fact_value" value="{{ fact_value }}" ref="fact_value" readonly>
+        <button @click="copyText('fact_value')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="legal_value">LEGAL:</label>
+        <input type="text" id="legal_value" name="legal_value" value="{{ legal_value }}" ref="legal_value" readonly>
+        <button @click="copyText('legal_value')">Copy</button>
+        <br>
+        <br>
+        <br> -->
+        <label for="input_1">INPUT-1:</label>
+        <input type="text" id="input_1" name="input_1" value="{{ input_1 }}" ref="input_1" readonly>
+        <button @click="copyText('input_1')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="counsel_output_1">OUTPUT 1</label>
+        <input type="text" id="counsel_output_1" name="counsel_output_1" v-model="counsel_output_1" readonly>
+        <br>
+        <input type="submit" value="Paste" @click="pasteOutput1">
+        <br>
+        <br>
+        <br>
+        <label for="instruction">Input 2:</label>
+        <input type="text" id="instruction" name="instruction" value="{{ instruction }}" ref="instruction" readonly>
+        <button @click="copyText('instruction')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="counsel_output_2">OUTPUT 2</label>
+        <input type="text" id="counsel_output_2" name="counsel_output_2" v-model="counsel_output_2" readonly>
+        <br>
+        <input type="submit" value="Paste & Submit" @click="pasteAndSubmit">
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    const { createApp, ref, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+    createApp({
+        setup() {
+            const url = window.location.href;
+            const uuid = window.location.href.split('/');
+            const system_instruction = ref(null);
+            const law_topics = ref(null);
+            const fact_value = ref(null);
+            const legal_value = ref(null);
+            const instruction = ref(null);
+            const input_1 = ref(null);
+            const counsel_output_1 = ref('');
+            const counsel_output_2 = ref('');
+            const copyText = (value) => {
+                switch (value) {
+                    case 'system_instruction':
+                        system_instruction.value.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'law_topics':
+                        law_topics.value.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'fact_value':
+                        fact_value.value.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'legal_value':
+                        legal_value.value.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'instruction':
+                        instruction.value.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_1':
+                        input_1.value.select();
+                        document.execCommand('copy');
+                        break;
+                    default:
+                        console.log('Invalid value');
+                }
+            };
+            const pasteOutput1 = () => {
+                const pastedText = navigator.clipboard.readText()
+                    .then(text => {
+                        counsel_output_1.value = text;
+                        console.log("1st output::", counsel_output_1.value);
+                    })
+                    .catch(err => {
+                        console.error('Failed to read clipboard contents: ', err);
+                    });
+            };
+            const pasteAndSubmit = async () => {
+                const pastedText = navigator.clipboard.readText()
+                    .then(text => {
+                        counsel_output_2.value = counsel_output_1.value + text;
+                        axios.put('/api/brief_arguments/'+uuid[4]+"/", {
+                            counsel_output: counsel_output_2.value,
+                            brief_id: uuid[4],
+                        }, {
+                            headers: {
+                                'X-CSRFToken': csrftoken
+                            }
+                        }).then(response => {
+                            if (response.status === 200) {
+                                window.location.href = response.request.responseURL;
+                            }
+                        }).catch(error => {
+                            console.error(error);
+                        });
+                    })
+                    .catch(err => {
+                        console.error('Failed to read clipboard contents: ', err);
+                    });
+            };
+            return {
+                ...toRefs({
+                    copyText,
+                    pasteOutput1,
+                    pasteAndSubmit,
+                }),
+                system_instruction,
+                law_topics,
+                fact_value,
+                legal_value,
+                instruction,
+                input_1,
+                counsel_output_1,
+                counsel_output_2,
+            };
+        },
+    }).mount('#app');
+</script>
+
+
+</html>
