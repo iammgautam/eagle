@@ -4,34 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brief Legal Researcher</title>
+    <title>Step 1</title>
 </head>
 
 <body>
     <div id="app">
-        <h1>Chat 1</h1>
-        <!-- <label for="system_instruction">SYSTEM INSTRUCTION:</label>
-        <input type="text" id="system_instruction" name="system_instruction" value="{{ system_instruction }}"
-            ref="system_instruction" readonly>
-        <button @click="copyText('system_instruction')">Copy</button>
-        <br>
-        <br>
-        <br>
-        <label for="input_topics">Topics:</label>
-        <input type="text" id="input_topics" name="input_topics" value="{{ input_topics }}" ref="input_topics" readonly>
-        <button @click="copyText('input_topics')">Copy</button>
-        <br>
-        <br>
-        <br>
-        <label for="legal_fact">FACT_AND_LEGAL:</label>
-        <input type="text" id="legal_fact" name="legal_fact" value="{{ legal_fact }}" ref="legal_fact" readonly>
-        <button @click="copyText('legal_fact')">Copy</button>
-        <br>
-        <br>
-        <br>
-        <label for="instruction">INSTRUCTION:</label>
-        <input type="text" id="instruction" name="instruction" value="{{ instruction }}" ref="instruction" readonly>
-        <button @click="copyText('instruction')">Copy</button> -->
+        <h1>Step 1</h1>
         <label for="research_input">Input 1:</label>
         <input type="text" id="research_input" name="research_input" value="{{ research_input }}" ref="research_input"
             readonly>
@@ -40,9 +18,9 @@
         <br>
         <br>
         <label for="reseach_output">OUTPUT</label>
-        <input type="text" id="reseach_output" name="reseach_output" v-model="reseachOutput" readonly>
+        <input type="text" id="reseach_output" name="reseach_output" v-model="reseachOutput">
         <br>
-        <input type="submit" value="Paste & Submit" @click="pasteAndSubmit">
+        <input type="submit" value="Submit" @click="pasteAndSubmit">
     </div>
 </body>
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -54,30 +32,10 @@
         setup() {
             const url = window.location.href;
             const uuid = window.location.href.split('/');
-            const system_instruction = ref(null);
-            const input_topics = ref(null);
-            const legal_fact = ref(null);
-            const instruction = ref(null);
             const research_input = ref(null);
             const reseachOutput = ref('');
             const copyText = (value) => {
                 switch (value) {
-                    // case 'system_instruction':
-                    //     system_instruction.value.select();
-                    //     document.execCommand('copy');
-                    //     break;
-                    // case 'input_topics':
-                    //     input_topics.value.select();
-                    //     document.execCommand('copy');
-                    //     break;
-                    // case 'legal_fact':
-                    //     legal_fact.value.select();
-                    //     document.execCommand('copy');
-                    //     break;
-                    // case 'instruction':
-                    //     instruction.value.select();
-                    //     document.execCommand('copy');
-                    //     break;
                     case 'research_input':
                         research_input.value.select();
                         document.execCommand('copy');
@@ -87,33 +45,29 @@
                 }
             };
             const pasteAndSubmit = () => {
-                const pastedText = navigator.clipboard.readText()
-                    .then(text => {
-                        const pattern = /<Topic[^>]*>([^<]*)/g;
-                        const matches = text.match(pattern);
-                        const formattedTopics = [];
-                        for (const match of matches) {
-                            formattedTopics.push(match.substring(match.indexOf('>') + 1));
-                        }
-                        reseachOutput.value = formattedTopics;
-                        axios.post('/api/brief_arguments/', {
-                            research_output: reseachOutput.value,
-                            case_id: uuid[4],
-                        }, {
-                            headers: {
-                                'X-CSRFToken': csrftoken
-                            }
-                        }).then(response => {
-                            if (response.status === 200) {
-                                window.location.href = response.request.responseURL;
-                            }
-                        }).catch(error => {
-                            console.error(error);
-                        });
-                    })
-                    .catch(err => {
-                        console.error('Failed to read clipboard contents: ', err);
-                    });
+                const textarea = document.getElementById('reseach_output');
+                const regex = /(\d+\.\d+)\s+([^(]+)\s*(\([^)]+\))?/g;
+                const matches = textarea.value.matchAll(regex);
+                relevantTopicList = [];
+                for (const match of matches) {
+                    const [full, number, text, parentheses] = match;
+                    const value = `${text}${parentheses || ''}`;
+                    relevantTopicList.push(value);
+                }
+                axios.post('/api/brief_arguments/', {
+                    research_output: relevantTopicList,
+                    case_id: uuid[4],
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    if (response.status === 200) {
+                        window.location.href = response.request.responseURL;
+                    }
+                }).catch(error => {
+                    console.error(error);
+                });
             };
 
             return {
@@ -121,10 +75,6 @@
                     copyText,
                     pasteAndSubmit,
                 }),
-                system_instruction,
-                input_topics,
-                legal_fact,
-                instruction,
                 reseachOutput,
                 research_input,
             };

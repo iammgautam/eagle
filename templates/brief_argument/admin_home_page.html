@@ -10,8 +10,9 @@
 <body>
     <br>
     Left:{{ count }}
+    <br>
     {% if case_history %}
-    <a href="{% url 'brief_argument:research_input' case_history.id %}">{{ case_history.petitioner_name }} vs {{
+    <a href="{% url 'brief_argument:step_1' case_history.id %}">{{ case_history.petitioner_name }} vs {{
         case_history.respondent_name }} in {{ case_history.high_court }}</a>
     {% else %}
     <p>No case history found.</p>

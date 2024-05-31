@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 {% load static %}
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -155,17 +156,11 @@
                                 processed</p>
                         </div> -->
                         <div class="flex flex-col items-start mt-10">
-                            <h2 class="text-zinc-500 text-sm mb-4" style="font-family: Inter, sans-serif">GENERATE</h2>
                             <div class="flex flex-col sm:flex-row justify-start">
                                 <button
-                                    class="flex items-center justify-center text-l text-[#C3E2EF] bg-[#050142] rounded-full px-6 py-3 mr-4 mb-4 sm:mb-0"
+                                    class="flex items-center justify-center text-l text-[#1C175C] rounded-full px-6 py-3 mr-4 mb-4 sm:mb-0 border border-solid border-[#1C175C]"
                                     @click.prevent="submitForm('petitioner')">
-                                    Petitioner
-                                </button>
-                                <button
-                                    class="flex items-center justify-center text-l text-[#C3E2EF] bg-[#050142] rounded-full px-6 py-3"
-                                    @click.prevent="submitForm('respondent')">
-                                    Respondent
+                                    Generate Memo
                                 </button>
                             </div>
                         </div>
@@ -303,14 +298,12 @@
             };
             const submitForm = async (submit_type) => {
                 validationCheck();
-                caseDetail.submit_type = submit_type;
                 if (validationError.value === false) {
                     const requestData = {
                         petitioner_name: caseDetail.value.petitioner_name,
                         respondent_name: caseDetail.value.respondent_name,
                         fact_case: caseDetail.value.fact_case,
                         legal_issue: caseDetail.value.legal_issue,
-                        submit_type: submit_type,
                         high_court: selectedCourt.value
                     };
                     console.log("Details::", requestData);
