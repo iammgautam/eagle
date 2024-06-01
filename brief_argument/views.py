@@ -1,117 +1,41 @@
 import re
-from legal_gpt import settings
 from django.http import HttpResponseRedirect
+from django.middleware.csrf import get_token
 from django.urls import reverse
 from django.shortcuts import render
-from rest_framework.response import Response
 from django.core.mail import EmailMultiAlternatives
-from django.core.cache import cache
 from django.template.loader import render_to_string
 from rest_framework import viewsets
 from .models import Argument, BriefArgument
-from rest_framework import status
 from case_history.models import CaseHistory
-from case_history.models import LawTopics
 from .serializers import ArgumentSerializer, BriefArgumentSerializer
-from django.middleware.csrf import get_token
+from case_history.models import LawTopics
+from legal_gpt import settings
 
 
-INPUT_TOPICS = """<Law 1>Constitutional Law<Topic 1.1>FUNDAMENTAL RIGHTS: MEANING OF STATE AND LAW (Articles 12-13)<Token>29406</Token></Topic 1.1><Topic 1.2>RIGHT TO EQUALITY (Articles 14-18)<Token>49262</Token></Topic 1.2><Topic 1.3>Right to Freedom (Articles 19-22)<Token>54975</Token></Topic 1.3><Topic 1.4>RIGHT AGAINST EXPLOITATION (Articles 23-24)<Token>1515</Token></Topic 1.4><Topic 1.5>RIGHT TO FREEDOM OF RELIGION (Articles 25-28)<Token>9622</Token></Topic 1.5><Topic 1.6>CULTURAL AND EDUCATIONAL RIGHTS (Articles 29-30)<Token>10760</Token></Topic 1.6><Topic 1.7>RIGHT TO CONSTITUTIONAL REMEDIES (Article 32)<Token>7717</Token></Topic 1.7><Topic 1.8>FUNDAMENTAL DUTIES (Article 51A)<Token>1980</Token></Topic 1.8><Topic 1.9>DIRECTIVE PRINCIPLES OF STATE POLICY (Articles 36-51)<Token>4557</Token></Topic 1.9><Topic 1.10>THE AMENDMENT OF THE CONSTITUTION (Article 368)<Token>21918</Token></Topic 1.10></Law 1>"""
+NEW_INPUT_TOPICS = """1 Constitutional Law:
+ 1.1 FUNDAMENTAL RIGHTS: MEANING OF STATE AND LAW (Articles 12-13) Size:29406,
+ 1.2 RIGHT TO EQUALITY (Articles 14-18) Size:49262,
+ 1.3 Right to Freedom (Articles 19-22) Size:54975,
+ 1.4 RIGHT AGAINST EXPLOITATION (Articles 23-24) Size:1515,
+ 1.5 RIGHT TO FREEDOM OF RELIGION (Articles 25-28) Size:9622,
+ 1.6 CULTURAL AND EDUCATIONAL RIGHTS (Articles 29-30) Size:10760,
+ 1.7 RIGHT TO CONSTITUTIONAL REMEDIES (Article 32) Size:7717,
+ 1.8 FUNDAMENTAL DUTIES (Article 51A) Size:1980,
+ 1.9 DIRECTIVE PRINCIPLES OF STATE POLICY (Articles 36-51) Size:4557,
+ 1.10 THE AMENDMENT OF THE CONSTITUTION (Article 368) Size:21918,"""
 
 
 def get_step_1_input(topics, facts, legal_issue):
-    return f"""You are a legal researcher tasked with finding the most relevant and applicable law topics for a particular legal case. To assist you, I will provide three key pieces of information:
-
-            <allLawTopics>
-            {topics}
-            </allLawTopics>
-
-            <facts>
-            {facts}
-            </facts>
-
-            <legalIssue>
-            {legal_issue}
-            </legalIssue>
-
-            Please follow these steps carefully:
-
-            1. Read the facts of the case and the legal issue thoroughly to fully understand the details and context of the case.
-
-            2. Review the provided list of law topics, paying close attention to how they are segmented and described. Make sure you have a clear grasp of what each topic entails.
-
-            3. Select the law topics that are most relevant and applicable to the case at hand, based on your analysis of the facts and the legal issue that needs to be addressed.
-
-            4. Check the cumulative size of your selected law topics. If the total size exceeds 125000, carefully deselect the least relevant and applicable topics from your list until the cumulative size is reduced to 125000 or below.
-
-            5. Provide your final curated list of the most relevant and applicable law topics for this case inside <relevant&applicableLawTopics> tags, formatted as follows:
-
-            <relevant&applicableLawTopics>
-            [list the relevant and applicable law topics here]
-            </relevant&applicableLawTopics>
-
-            Remember, your goal is to identify the law topics that are most pertinent and useful for addressing the legal issue, given the specific facts of the case. Carefully consider the relevance and applicability of each topic before making your final selections.
-
-            Sample Response Format:
-            <relevant&applicableLawTopics>
-            Topic 1.2: Topic_1.2_name <size>topic_1.2_size</size>
-            Topic 1.9: Topic_1.9_name <size>topic_1.9_size</size>
-            Topic 1.10: Topic_1.10_name <size>topic_1.10_size</size>
-            Total size: topic_1.2_size + topic_1.9_size + topic_1.10_size
-            </relevant&applicableLawTopics>
+    return f"""You are a legal researcher tasked with finding the most relevant and applicable law topics for a particular legal case. To assist you, I will provide three key pieces of information: <allLawTopics> {topics}</allLawTopics> <facts>{facts} </facts><legalIssue>{legal_issue}</legalIssue>Please follow these steps carefully:1. Read the facts of the case and the legal issue thoroughly to fully understand the details and context of the case.2. Review the provided list of law topics, paying close attention to how they are segmented and described. Make sure you have a clear grasp of what each topic entails.3. Select the law topics that are most relevant and applicable to the case at hand, based on your analysis of the facts and the legal issue that needs to be addressed.4. Check the cumulative size of your selected law topics. If the total size exceeds 125000, carefully deselect the least relevant and applicable topics from your list until the cumulative size is reduced to 125000 or below.5. Provide your final curated list of the most relevant and applicable law topics for this case inside <selected_law_topics> tags, formatted as follows:<selected_law_topics>[list the relevant and applicable law topics here]</selected_law_topics>Remember, your goal is to identify the law topics that are most pertinent and useful for addressing the legal issue, given the specific facts of the case. Carefully consider the relevance and applicability of each topic before making your final selections.  Strictly give response as per the given sample response format Sample Response Format:            <selected_law_topics>            1.2: "Topic_1.2_name"-"topic_1.2_size"            1.4: "Topic_1.4_name"-"topic_1.4_size"            9.3: "Topic_9.3_name"-"topic_9.3_size"             Total size: topic_1.2_size + topic_1.4_size + topic_9.3_size            </selected_law_topics>
             """
 
 
 def get_step_2_input(relevent_topics, fact, legal_issue):
     return f"""
-        You are a legal researcher tasked with drafting a legal memorandum for a particular case. To complete this task, please follow these steps: 
+        You are a legal researcher tasked with drafting a legal memorandum for a particular case. To complete this task, please follow these steps: 1. Carefully read and understand the statement of law provided: <statement_of_law> {relevent_topics} </statement_of_law> 2. Study the facts of the case: <facts_of_the_case> {fact} </facts_of_the_case> 3. Consider the legal question to be addressed: <legal_question> {legal_issue} </legal_question> 4. Before proceeding, take time to thoroughly understand the statement of law, facts of the case, and the legal question. Use <scratchpad> tags to brainstorm and organize your thoughts on how to approach the legal memorandum. 5. Structure your legal memorandum as follows: a. Question Presented - Formulate a specific and impartial question that captures the core legal issue without assuming a legal conclusion. b. Statement of Facts - Provide a concise, impartial summary of the key facts relevant to the legal matter, approximately 200 words in length. - Include current and past legal proceedings related to the issue. - Present the facts chronologically or grouped thematically, whichever format offers the clearest understanding. c. Analysis - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law. - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case in at least 500 words in length. - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. - The total length of the Analysis section should be approximately 2000 words. - Subsection titles must be enclosed in |$| tags as in $subsection_title$. d. Conclusion - In approximately 300 words, predict how the court will likely apply the law based on your analysis. - Before providing your prediction, express your level of confidence in the prediction based on the available information. - Using an impartial advisory tone, identify next steps and propose a legal strategy to proceed. 6. Provide your complete legal memorandum inside <legal_memorandum> tags. Remember to provide a thorough and well-reasoned legal analysis, incorporating the relevant legal principles from the statement of law, facts of the case, and application of law to the facts. Your memorandum should demonstrate a clear understanding of the legal issues at hand and provide valuable insights for the reader.
 
-        1. Carefully read and understand the statement of law provided: 
-
-        <statement_of_law> 
-        {relevent_topics} 
-        </statement_of_law> 
-
-        2. Study the facts of the case: 
-
-        <facts_of_the_case> 
-        {fact} 
-        </facts_of_the_case> 
-
-        3. Consider the legal question to be addressed: 
-
-        <legal_question> 
-        {legal_issue} 
-        </legal_question> 
-
-        4. Before proceeding, take time to thoroughly understand the statement of law, facts of the case, and the legal question. 
-
-        5. Structure your legal memorandum as follows: 
-
-        a. Question Presented 
-        - Formulate a specific and impartial question that captures the core legal issue without assuming a legal conclusion. 
-
-        b. Statement of Facts 
-        - Provide a concise, impartial summary of the key facts relevant to the legal matter, approximately 200 words in length. 
-        - Include current and past legal proceedings related to the issue. 
-        - Present the facts chronologically or grouped thematically, whichever format offers the clearest understanding. 
-
-        c. Analysis 
-        - Provide a well-reasoned legal analysis, discussing the application of the law to the facts of the case, incorporating the relevant legal principles (statutes and case laws) from the statement of law and facts from the case.
-        - outline the various legal topics to be addressed and provide an analysis of the legal issue, usually ordered in subsections. 
-        - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case in atleast 500 words in length. 
-        - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. 
-        - The total length of the Analysis section should be approximately 2000 words. 
-
-        d. Conclusion 
-        - In approximately 300 words, predict how the court will likely apply the law based on your analysis. 
-        - Express your level of confidence in the prediction based on the available information. 
-        - Using an impartial advisory tone, identify next steps and propose a legal strategy to proceed. 
-
-        6. Provide your complete legal memorandum inside <legal_memorandum> tags. 
-
-        Remember to provide a thorough and well-reasoned legal analysis, incorporating the relevant legal principles from the statement of law, facts of the case, and application of law to the facts. Your memorandum should demonstrate a clear understanding of the legal issues at hand and provide valuable insights for the reader.
-
+        Strictly follow the instructions and structure the legal memorandum as per the given format.
     """
 
 
@@ -170,15 +94,30 @@ class BriefArgumentViewSet(viewsets.ModelViewSet):
         )
 
     def counsel_formatter(self, string):
+        string = string.replace("<br>", "")
+        if "a. Question Presented" in string or "Question Presented" in string:
+            string = string.replace(
+                "a. Question Presented", "<br><h2><b>Question Presented</b></h2>"
+            ).replace("Question Presented", "<br><h2><b>Question Presented</b></h2>")
 
-        string = string.replace(
-            "a. Question Presented", "<h2><b>Question Presented</b></h2>"
-        )
-        string = string.replace(
-            "b. Statement of Facts", "<h2><b>Statement of Facts</b></h2>"
-        )
-        string = string.replace("c. Analysis", "<h2><b>Analysis</b></h2>")
-        string = string.replace("d. Conclusion", "<h2><b>Conclusion</b></h2>")
+        if "b. Statement of Facts" in string or "Statement of Facts" in string:
+            string = string.replace(
+                "b. Statement of Facts", "<br><h2><b>Statement of Facts</b></h2>"
+            ).replace("Statement of Facts", "<br><h2><b>Statement of Facts</b></h2>")
+
+        if "c. Analysis" in string or "Analysis" in string:
+            string = string.replace(
+                "c. Analysis", "<br><h2><b>Analysis</b></h2>"
+            ).replace("Analysis", "<br><h2><b>Analysis</b></h2>")
+
+        if "d. Conclusion" in string or "Conclusion" in string:
+            string = string.replace(
+                "d. Conclusion", "<br><h2><b>Conclusion</b></h2>"
+            ).replace("Conclusion", "<br><h2><b>Conclusion</b></h2>")
+        pattern = r"\|\$\|(.*?)\|\$\|"
+        matches = re.findall(pattern, string)
+        for title in matches:
+            string = string.replace(f"|$|{title}|$|", f"<b>{title}<b>")
         string = re.search(
             r"&lt;legal_memorandum&gt;(.*?)&lt;\/legal_memorandum&gt;",
             string,
@@ -190,7 +129,7 @@ class BriefArgumentViewSet(viewsets.ModelViewSet):
         topics = LawTopics.objects.filter(name__in=topics)
         topics_input_value = ""
         for topic in topics:
-            topics_input_value += f"{topic.content}"
+            topics_input_value += f"<{topic.name}>{topic.content}</{topic.name}>"
         return topics_input_value
 
     # def send_brief_email(self, brief_id, _relevant_topics):
@@ -224,7 +163,7 @@ def step_1(request, case_id):
     csrf_token = get_token(request)
     case_history = CaseHistory.objects.get(id=case_id)
     system_instruction = get_step_1_input(
-        INPUT_TOPICS, case_history.fact_case, case_history.legal_issue
+        NEW_INPUT_TOPICS, case_history.fact_case, case_history.legal_issue
     )
     context = {
         "research_input": system_instruction,
@@ -237,10 +176,9 @@ def step_1(request, case_id):
 #     parent_objs = LawTopics.objects.filter(parent__isnull=True)
 #     input_law_topics = ""
 #     for i, parent_obj in enumerate(parent_objs, start=1):
-#         input_law_topics += f"<Law {i}>{parent_obj.name}"
+#         input_law_topics += f"{i} {parent_obj.name}:\n"
 #         for y, child_obj in enumerate(parent_obj.lawtopics_set.all(), start=1):
-#             input_law_topics += f"<Topic {i}.{y}>{child_obj.name}<size>{child_obj.token_value}</size></Topic {i}.{y}>"
-#         input_law_topics += f"</Law {i}>"
+#             input_law_topics += f" {i}.{y} {child_obj.name} Size:{child_obj.token_value},\n"
 #     return input_law_topics
 
 
@@ -260,7 +198,7 @@ def step_2(request, brief_id):
 
 
 def admin_home_page(request):
-    # law_topics_format_generator()
+    # input = law_topics_format_generator()
     case_history = CaseHistory.objects.filter(is_completed=False).order_by(
         "created_date"
     )

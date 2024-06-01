@@ -34,8 +34,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     # installed apps
-    "brief_argument",
-    "case_history",
+    "brief_argument.apps.BriefArgumentConfig",
+    "case_history.apps.CaseHistoryConfig",
 ]
 
 MIDDLEWARE = [
