@@ -3,60 +3,52 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width='device-width', initial-scale=1.0">
-    <!-- Include the Quill library -->
-    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
-    <title>Step 2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 1</title>
 </head>
 
 <body>
     <div id="app">
-        <h1>Chat 2</h1>
-        <label for="input_1">INPUT:</label>
-        <input type="text" id="input_1" name="input_1" value="{{ input_1 }}" ref="input_1" readonly>
-        <button @click="copyText('input_1')">Copy</button>
+        <h1>Step 1</h1>
+        <label for="research_input">Input 1:</label>
+        <input type="text" id="research_input" name="research_input" value="{{ research_input }}" ref="research_input"
+            readonly>
+        <button @click="copyText('research_input')">Copy</button>
         <br>
         <br>
         <br>
-        <label for="counsel_output_2">OUTPUT</label>
+        <label for="reseach_output">OUTPUT</label>
+        <input type="text" id="reseach_output" name="reseach_output" v-model="reseachOutput">
         <br>
         <input type="submit" value="Submit" @click="pasteAndSubmit">
-    </div>
-    <div id="editor">
     </div>
 </body>
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script>
     const { createApp, ref, toRefs } = Vue;
     const csrftoken = '{{ csrf_token }}';
-    const quill = new Quill('#editor', {
-        theme: 'snow'
-    });
     createApp({
         setup() {
             const url = window.location.href;
             const uuid = window.location.href.split('/');
-            const input_1 = ref(null);
-            const counsel_output_2 = ref('');
+            const research_input = ref(null);
+            const reseachOutput = ref('');
             const copyText = (value) => {
                 switch (value) {
-                    case 'input_1':
-                        input_1.value.select();
+                    case 'research_input':
+                        research_input.value.select();
                         document.execCommand('copy');
                         break;
                     default:
                         console.log('Invalid value');
                 }
             };
-            const pasteAndSubmit = async () => {
-                var html = quill.root.innerHTML;
-                console.log('What is rich test::', html)
-                const textarea = document.getElementById('counsel_output_2');
-                axios.put('/api/brief_arguments/' + uuid[4] + "/", {
-                    counsel_output: html,
-                    brief_id: uuid[4],
+            const pasteAndSubmit = () => {
+                const textarea = document.getElementById('reseach_output');
+                axios.post('/api/brief_arguments/', {
+                    research_output: textarea.value,
+                    case_id: uuid[4],
                 }, {
                     headers: {
                         'X-CSRFToken': csrftoken
@@ -69,13 +61,14 @@
                     console.error(error);
                 });
             };
+
             return {
                 ...toRefs({
                     copyText,
                     pasteAndSubmit,
                 }),
-                input_1,
-                counsel_output_2,
+                reseachOutput,
+                research_input,
             };
         },
     }).mount('#app');
