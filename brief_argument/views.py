@@ -329,6 +329,17 @@ class BriefArgumentViewSet(viewsets.ModelViewSet):
         pattern = r"\d+\.\d+:\s*(.*?)-\d+"
         matches = re.findall(pattern, topics)
         output = [match for match in matches]
+        print('WHat is the output::', output)
+        output = []
+        for match in matches:
+            if match.startswith('"') and match.endswith('"'):
+                output.append(match.strip('"'))
+            else:
+                output.append(match)
+        print('WHat is the output::', output)
+        
+        # return output
+
         topics = LawTopics.objects.filter(name__in=output)
         topics_input_value = ""
         for topic in topics:
