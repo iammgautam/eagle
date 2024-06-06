@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All India Bar Question-Answer by Syndicus</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', sans-serif;
+            line-height: 1.5;
+        }
+
+        .container {
+            width: full;
+            padding: 20px;
+        }
+
+        .heading {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .subheading {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        .paragraph {
+            font-size: 14px;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+
+        .separator {
+            border-top: 1px solid #000;
+            margin: 20px 0;
+        }
+
+        .list-item {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        {{ string|safe }}
+    </div>
+</body>
+
+</html>

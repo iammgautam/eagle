@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Include the Quill library -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <title>Step 3</title>
+</head>
+
+<body>
+    <div id="app">
+        <h1>Step 3</h1>
+        {% for input in step_3_input %}
+        <label for="analysis_input_{{ forloop.counter0 }}">Input {{ forloop.counter0 }}:</label>
+        <input type="text" id="research_input_{{ forloop.counter0 }}" name="research_input" value="{{ input.input }}"
+            ref="research_input" readonly>
+        <button @click="copyText('research_input_{{ forloop.counter0 }}')">Copy</button>
+        <br>
+        <br>
+        <br>
+        {% endfor %}
+        <br>
+        <input type="submit" value="Submit" @click="pasteAndSubmit">
+    </div>
+    {% for input in step_3_input %}
+    <label for="research_input_{{ forloop.counter0 }}">OUTPUT {{ forloop.counter0 }}:</label>
+    <div id="editor_{{ forloop.counter0 }}"></div>
+    {% endfor %}
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    const { createApp, ref, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+    const step_3_input_length = Number('{{ step_3_length }}');
+    const value_array = JSON.parse('{{ step_3_input_json|escapejs }}');
+    let quillEditors = [];
+    for (let i = 0; i < step_3_input_length; i++) {
+        const quill = new Quill(`#editor_${i}`, {
+            theme: 'snow'
+        });
+        quillEditors.push(quill);
+    }
+    createApp({
+        setup() {
+            const url = window.location.href;
+            const uuid = window.location.href.split('/');
+            const research_input = ref(null);
+            const reseachOutput = ref('');
+            const copyText = (value) => {
+                const inputElement = document.getElementById(value);
+                inputElement.select();
+                document.execCommand('copy');
+            };
+            const pasteAndSubmit = () => {
+                const outputValues = [];
+                for (let i = 0; i < step_3_input_length; i++) {
+                    outputValues.push({ 'id': value_array[i].ids, 'detailed_content': quillEditors[i].root.innerHTML });
+                }
+                axios.post('/api/arguments/', {
+                    detailed_analysis: outputValues,
+                    legal_memo: uuid[4],
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    if (response.status === 200) {
+                        window.location.href = response.request.responseURL;
+                    }
+                }).catch(error => {
+                    console.error(error);
+                    alert("Please check your Pasted output!!")
+                });
+            };
+
+            return {
+                ...toRefs({
+                    copyText,
+                    pasteAndSubmit,
+                }),
+                reseachOutput,
+                research_input,
+            };
+        },
+    }).mount('#app');
+</script>
+
+
+</html>

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width='device-width', initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Include the Quill library -->
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
     <title>Step 2</title>
@@ -11,17 +11,17 @@
 
 <body>
     <div id="app">
-        <h1>Step 2</h1>
-        <label for="input_1">INPUT:</label>
-        <input type="text" id="input_1" name="input_1" value="{{ input_1 }}" ref="input_1" readonly>
-        <button @click="copyText('input_1')">Copy</button>
+        <h1>AIB Step 2</h1>
+        <label for="aib_input">Input:</label>
+        <input type="text" id="aib_input" name="aib_input" value="{{ aib_input }}" ref="aib_input" readonly>
+        <button @click="copyText('aib_input')">Copy</button>
         <br>
         <br>
         <br>
-        <label for="counsel_output_2">OUTPUT</label>
         <br>
         <input type="submit" value="Submit" @click="pasteAndSubmit">
     </div>
+    <label for="aib_output">OUTPUT</label>
     <div id="editor">
     </div>
 </body>
@@ -38,23 +38,23 @@
         setup() {
             const url = window.location.href;
             const uuid = window.location.href.split('/');
-            const input_1 = ref(null);
-            const counsel_output_2 = ref('');
+            const aib_input = ref(null);
+            const aib_output = ref('');
             const copyText = (value) => {
                 switch (value) {
-                    case 'input_1':
-                        input_1.value.select();
+                    case 'aib_input':
+                        aib_input.value.select();
                         document.execCommand('copy');
                         break;
                     default:
                         console.log('Invalid value');
                 }
             };
-            const pasteAndSubmit = async () => {
+            const pasteAndSubmit = () => {
                 var html = quill.root.innerHTML;
-                axios.put('/api/legal_memo/' + uuid[4] + "/", {
-                    counsel_output: html,
-                    brief_id: uuid[4],
+                axios.put('/api/aib_exam/' + uuid[4] + '/', {
+                    aib_final_result: html,
+                    step_2: true,
                 }, {
                     headers: {
                         'X-CSRFToken': csrftoken
@@ -67,13 +67,14 @@
                     console.error(error);
                 });
             };
+
             return {
                 ...toRefs({
                     copyText,
                     pasteAndSubmit,
                 }),
-                input_1,
-                counsel_output_2,
+                aib_input,
+                aib_output,
             };
         },
     }).mount('#app');

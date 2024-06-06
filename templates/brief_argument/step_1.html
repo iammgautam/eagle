@@ -46,7 +46,7 @@
             };
             const pasteAndSubmit = () => {
                 const textarea = document.getElementById('reseach_output');
-                axios.post('/api/brief_arguments/', {
+                axios.post('/api/legal_memo/', {
                     research_output: textarea.value,
                     case_id: uuid[4],
                 }, {

@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext as _
 import uuid
-from brief_argument.models import BriefArgument
+from brief_argument.models import Legal_Memorandum
 
 # Create your models here.
 class CaseHistory(models.Model):
@@ -11,7 +11,7 @@ class CaseHistory(models.Model):
     legal_issue = models.TextField(verbose_name=_("Legal Issue"), null=True, blank=True)
     high_court = models.CharField(max_length=255, null=True, blank=True)
     fact_case = models.TextField(verbose_name=_("Fact of the Case"), null=True, blank=True)
-    brief_argument = models.OneToOneField(BriefArgument, null=True, blank=True, on_delete=models.CASCADE,related_name="case_history")
+    legal_memo = models.OneToOneField(Legal_Memorandum, null=True, blank=True, on_delete=models.CASCADE, related_name="case_history")
     SUBMIT_CHOICES = [
         ('petitioner', _("Petitioner")),
         ('respondent', _('Respondent')),

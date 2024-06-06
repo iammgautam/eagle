@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIB EXAM</title>
+</head>
+
+<body>
+    <div id="app">
+        <h2>
+        <a href="{% url 'brief_argument:home' %}">Back</a>
+        </h2>
+        <h1>AIB EXAM</h1>
+        <label for="question">Question:</label>
+        <input type="text" id="Question" name="question" v-model="question">
+        <br>
+        <br>
+        <label for="option_a">OPTION A:</label>
+        <input type="text" id="option_a" name="option_a" v-model="option_a">
+        <br>
+        <br>
+        <label for="option_b">OPTION B:</label>
+        <input type="text" id="option_b" name="option_b" v-model="option_b">
+        <br>
+        <br>
+        <label for="option_c">OPTION C:</label>
+        <input type="text" id="option_c" name="option_c" v-model="option_c">
+        <br>
+        <br>
+        <label for="option_d">OPTION D:</label>
+        <input type="text" id="option_d" name="option_d" v-model="option_d">
+        <br>
+        <br>
+        <input type="submit" value="Submit" @click="pasteAndSubmit">
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    const { createApp, ref, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+    createApp({
+        setup() {
+            const url = window.location.href;
+            const uuid = window.location.href.split('/');
+            const question = ref(null);
+            const option_a = ref(null);
+            const option_b = ref(null);
+            const option_c = ref(null);
+            const option_d = ref(null);
+            const pasteAndSubmit = () => {
+                axios.post('/api/aib_exam/', {
+                    question: question.value,
+                    option_a: option_a.value,
+                    option_b: option_b.value,
+                    option_c: option_c.value,
+                    option_d: option_d.value,
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    if (response.status === 200) {
+                        window.location.href = response.request.responseURL;
+                    }
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+            return {
+                ...toRefs({
+                    pasteAndSubmit,
+                }),
+                question,
+                option_a,
+                option_b,
+                option_c,
+                option_d,
+                
+            };
+        },
+    }).mount('#app');
+</script>
+
+
+</html>

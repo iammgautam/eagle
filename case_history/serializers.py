@@ -1,10 +1,8 @@
 from rest_framework import serializers
 from .models import CaseHistory, HighCourts
-from brief_argument.serializers import BriefArgumentSerializer
 
 
 class CaseHistorySerializer(serializers.ModelSerializer):
-    brief_argument = BriefArgumentSerializer(read_only=True)
 
     class Meta:
         model = CaseHistory
@@ -15,7 +13,7 @@ class CaseHistorySerializer(serializers.ModelSerializer):
             "legal_issue",
             "fact_case",
             "high_court",
-            "brief_argument",
+            "legam_memo",
             "is_completed",
             "submit_type",
             "created_date",
