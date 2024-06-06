@@ -505,18 +505,21 @@ def aib_exam_step_2_input(
 
 
 def relevent_topics_input_generator(topics, aib=False):
-    # pattern = r"\d+\.\d+:\s*(.*?)-\d+"
-    pattern = r"Topic \d+\.\d+\s*(.*?)-(\d+)"
+    pattern = r"Topic \d+\.\d+:\s*(.*?)\s+(Size:\d+)"
     matches = re.findall(pattern, topics)
     if matches == []:
+        pattern = r'Topic \d+\.\d+:\s*(.*?)-(\d+)'
+        matches = re.findall(pattern, topics)
+    if matches == []:
         pattern = r"Topic \d+\.\d+\s*(.*?)\s+(Size:\d+)"
-    matches = re.findall(pattern, topics)
-    # if aib == True:
-    #     pattern = r"\d+\.\d+\s*(.*?)\s+Size:\d+"
+        matches = re.findall(pattern, topics)
+    if matches == []:
+        pattern = r"Topic \d+\.\d+\s*(.*?)-(\d+)"
+        matches = re.findall(pattern, topics)
     print("OUTPUT::", matches)
     output = []
     for match in matches:
-        # if match.startswith('"') and match.endswith('"'):
+        # if match[0].startswith('"') or match[0].endswith('"'):
         #     output.append(match.strip('"'))
         # else:
         output.append(match[0])
