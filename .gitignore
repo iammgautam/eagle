@@ -164,5 +164,5 @@ cython_debug/
 db_dump.sql
 
 # Ignore Django migration files
-brief_argument/migrations/*
-case_history/migrations/*
+# brief_argument/migrations/*
+# case_history/migrations/*
