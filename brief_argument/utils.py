@@ -505,20 +505,15 @@ def aib_exam_step_2_input(
 
 
 def relevent_topics_input_generator(topics, aib=False):
-    pattern = r"Topic \d+\.\d+:\s*(.*?)\s+(Size:\d+)"
-    matches = re.findall(pattern, topics)
-    if matches == []:
-        pattern = r'Topic \d+\.\d+:\s*(.*?)-(\d+)'
-        matches = re.findall(pattern, topics)
-    if matches == []:
-        pattern = r"Topic \d+\.\d+\s*(.*?)\s+(Size:\d+)"
-        matches = re.findall(pattern, topics)
-    if matches == []:
-        pattern = r"Topic \d+\.\d+\s*(.*?)-(\d+)"
-        matches = re.findall(pattern, topics)
-    print("OUTPUT::", matches)
+    matches_1 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+(Size:\d+)", topics)
+    matches_2 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+-\s+(\d+)", topics)
+    matches_3 = re.findall(r'Topic \d+\.\d+:\s*(.*?)-(\d+)', topics)
+    matches_4 = re.findall(r"Topic \d+\.\d+\s*(.*?)\s+(Size:\d+)", topics)
+    matches_5 = re.findall(r"Topic \d+\.\d+\s*(.*?)-(\d+)", topics)
+    total_matches = matches_1 + matches_2 + matches_3 + matches_4 + matches_5
+    print("OUTPUT::", total_matches)
     output = []
-    for match in matches:
+    for match in total_matches:
         # if match[0].startswith('"') or match[0].endswith('"'):
         #     output.append(match.strip('"'))
         # else:
