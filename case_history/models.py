@@ -20,7 +20,7 @@ class LawTopics(models.Model):
     content = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     parent = models.ForeignKey("self", null=True, on_delete=models.CASCADE, blank=True)
-    topic_id = models.FloatField(null=True, blank=True)
+    topic_id = models.CharField(null=True, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)
 
