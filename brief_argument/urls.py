@@ -13,6 +13,7 @@ from .views import (
     aib_step_1,
     aib_step_2,
     aib_exam_adim_page,
+    legal_memo_frontend,
 )
 from case_history.views import CaseHistoryViewSet, HighCourtViewsets
 
@@ -35,4 +36,9 @@ urlpatterns = [
     path("step_1/<int:aib_exam_id>/", aib_step_1, name="aib_step_1"),
     path("step_2/<int:aib_exam_id>/", aib_step_2, name="aib_step_2"),
     path("aib_admin/", aib_exam_adim_page, name="aib_exam_admin_page"),
+    path(
+        "legal_memorandum/<uuid:legal_memo_id>/",
+        legal_memo_frontend,
+        name="legal_memo_fe",
+    ),
 ]

@@ -50,6 +50,9 @@
     <div class="container">
         {{ string|safe }}
     </div>
+    LEGAL MEMORANDUM: 
+    <!-- <a href="{% url 'brief_argument:legal_memo_fe' id %}">LEGAL MEMO FE</a> -->
+    <a href="http://{{ domain_name }}:8000{% url 'brief_argument:legal_memo_fe' id %}">Click Here.</a>
 </body>
 
 </html>

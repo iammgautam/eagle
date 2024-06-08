@@ -12,7 +12,7 @@
     Left:{{ count }}
     <br>
     {% if case_history %}
-    <a href="{% url 'brief_argument:step_1' case_history.id %}">{{ case_history.petitioner_name }} vs {{case_history.respondent_name }} in {{ case_history.high_court }}</a>
+    <a href="{% url 'brief_argument:step_1' case_history.id %}">{{ case_history.legal_issue }}</a>
     {% else %}
     <p>No case history found.</p>
     {% endif %}

@@ -4,6 +4,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
 from legal_gpt import settings
 from case_history.models import LawTopics
+from legal_gpt import settings
 
 INPUT_TOPICS = """Law 1 Constitutional Law:
     Topic 1.1 Constitution and Constitutionalism Size:14102,
@@ -217,58 +218,157 @@ def get_step_1_input(topics, facts, legal_issue):
     return f"""You are a legal researcher tasked with finding the most relevant and applicable law topics for a particular legal case. To assist you, I will provide three key pieces of information: <allLawTopics> {topics}</allLawTopics> <facts>{facts} </facts><legalIssue>{legal_issue}</legalIssue>Please follow these steps carefully:1. Read the facts of the case and the legal issue thoroughly to fully understand the details and context of the case.2. Review the provided list of law topics, paying close attention to how they are segmented and described. Make sure you have a clear grasp of what each topic entails.3. Select the law topics that are most relevant and applicable to the case at hand, based on your analysis of the facts and the legal issue that needs to be addressed.4. Check the cumulative size of your selected law topics. If the total size exceeds 125000, carefully deselect the least relevant and applicable topics from your list until the cumulative size is reduced to 125000 or below.5. Provide your final curated list of the most relevant and applicable law topics for this case inside <selected_law_topics> tags, formatted as follows:<selected_law_topics>[list the relevant and applicable law topics here]</selected_law_topics>Remember, your goal is to identify the law topics that are most pertinent and useful for addressing the legal issue, given the specific facts of the case. Carefully consider the relevance and applicability of each topic before making your final selections.  Strictly give response as per the given sample response format Sample Response Format:            <selected_law_topics>            Topic 1.2: "Topic_1.2_name"-"topic_1.2_size"           Topic 1.4: "Topic_1.4_name"-"topic_1.4_size"           Topic 9.3: "Topic_9.3_name"-"topic_9.3_size"             Total size: topic_1.2_size + topic_1.4_size + topic_9.3_size            </selected_law_topics>"""
 
 
-def get_step_2_input(relevent_topics, fact, legal_issue):
+def get_step_2_input_with_lr(relevent_topics, facts, legal, research):
+    return f"""You are a legal researcher tasked with drafting a legal memorandum for a particular case. To
+        complete this task, please follow these steps:
+
+        1. Carefully read and understand the statement of law provided:
+
+        <statement_of_law>
+        {relevent_topics}
+        </statement_of_law>
+
+        2. Carefully read and understand the legal research material provided:
+
+        <legal_research>
+        {research}
+        </legal_research>
+
+        3. Study the facts of the case:
+
+        <facts_of_the_case>
+        {facts}
+        </facts_of_the_case>
+
+        4. Consider the legal question to be addressed:
+
+        <legal_question>
+        {legal}
+        </legal_question>
+
+        5. Before proceeding, take time to thoroughly understand the statement of law, legal research
+        material, facts of the case, and the legal question.
+
+        6. Structure your legal memorandum as follows:
+
+        !%!Question Presented!%!  
+        - Formulate a specific and impartial question that captures the core legal issue without assuming a
+        legal conclusion.
+
+        !%!Statement of Facts!%!  
+        - Provide a concise, impartial summary of the key facts relevant to the legal matter, approximately
+        200 words in length.
+        - Include current and past legal proceedings related to the issue.
+        - Present the facts chronologically or grouped thematically, whichever format offers the clearest
+        understanding.
+
+        !%!Analysis!%!  
+        - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the
+        facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws)
+        from the statement of law and legal research material.
+        - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case.
+        - For each topic, clearly state the applicable law and relevant facts in an active voice and present
+        your analysis in a logical manner.
+        - The total length of the Analysis section should be approximately 2000 words.
+        - Subsection titles must be enclosed in |$| tags as in |$|subsection_title|$|.
+
+        !%!Conclusion!%!  
+        - In approximately 300 words, predict how the court will likely apply the law based on your
+        analysis.
+        - Before providing your prediction, express your level of confidence in the prediction based on the
+        available information.
+        - Using an impartial advisory tone, identify next steps and propose a legal strategy to proceed.
+
+        7. Provide your complete legal memorandum inside <legal_memorandum> tags.
+
+        Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the
+        relevant law, the facts of this case, and your application of that law to those facts to address the
+        stated legal question. Your memorandum should demonstrate a clear understanding of the legal issues
+        at hand and provide valuable insights for the reader.
+
+        Strictly follow the instructions and structure the legal memorandum as per the given format.
+"""
+
+
+def get_step_2_input_without_lr(relevent_topics, facts, legal):
     return f"""
-       You are a legal researcher tasked with drafting a legal memorandum for a particular case. To complete this task, please follow these steps: 
+        You are a legal researcher tasked with drafting a legal memorandum for a particular case. To
+        complete this task, please follow these steps:
 
-        1. Carefully read and understand the statement of law provided: 
+        1. Carefully read and understand the statement of law provided:
 
-        <statement_of_law> 
-        {relevent_topics} 
-        </statement_of_law> 
+        <statement_of_law>
+        {relevent_topics}
+        </statement_of_law>
 
-        2. Study the facts of the case: 
+        2. Study the facts of the case:
 
-        <facts_of_the_case> 
-        {fact} 
-        </facts_of_the_case> 
+        <facts_of_the_case>
+        {facts}
+        </facts_of_the_case>
 
-        3. Consider the legal question to be addressed: 
+        3. Consider the legal question to be addressed:
 
-        <legal_question> 
-        {legal_issue} 
-        </legal_question> 
+        <legal_question>
+        {legal}
+        </legal_question>
 
-        4. Before proceeding, take time to thoroughly understand the statement of law, facts of the case, and the legal question. 
+        4. Before proceeding, take time to thoroughly understand the statement of law, facts of the case, and the legal question.
 
-        5. Structure your legal memorandum as follows: 
+        5. Structure your legal memorandum as follows:
 
-        !%!Question Presented!%! 
-        - Formulate a specific and impartial question that captures the core legal issue without assuming a legal conclusion. 
+        !%!Question Presented!%!  
+        - Formulate a specific and impartial question that captures the core legal issue without assuming a
+        legal conclusion.
 
-        !%!Statement of Facts!%!   
-        - Provide a concise, impartial summary of the key facts relevant to the legal matter, approximately 200 words in length. 
-        - Include current and past legal proceedings related to the issue. 
-        - Present the facts chronologically or grouped thematically, whichever format offers the clearest understanding. 
+        !%!Statement of Facts!%!  
+        - Provide a concise, impartial summary of the key facts relevant to the legal matter, approximately
+        200 words in length.
+        - Include current and past legal proceedings related to the issue.
+        - Present the facts chronologically or grouped thematically, whichever format offers the clearest
+        understanding.
 
-        !%!Analysis!% ! 
-        - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law. 
-        - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case in at least 500 words in length. 
-        - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. 
-        - The total length of the Analysis section should be approximately 2000 words. 
-        - Subsection titles must be enclosed in |$| tags as in |$|subsection_title|$|. 
+        !%!Analysis!%!  
+        - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the
+        facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws)
+        from the statement of law.
+        - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case.
+        - For each topic, clearly state the applicable law and relevant facts in an active voice and present
+        your analysis in a logical manner.
+        - The total length of the Analysis section should be approximately 2000 words.
+        - Subsection titles must be enclosed in |$| tags as in |$|subsection_title|$|.
 
-        !%!Conclusion!% ! 
-        - In approximately 300 words, predict how the court will likely apply the law based on your analysis. 
-        - Before providing your prediction, express your level of confidence in the prediction based on the available information. 
-        - Using an impartial advisory tone, identify next steps and propose a legal strategy to proceed. 
+        !%!Conclusion!%!  
+        - In approximately 300 words, predict how the court will likely apply the law based on your
+        analysis.
+        - Before providing your prediction, express your level of confidence in the prediction based on the
+        available information.
+        - Using an impartial advisory tone, identify next steps and propose a legal strategy to proceed.
 
-        6. Provide your complete legal memorandum inside <legal_memorandum> tags. 
+        7. Provide your complete legal memorandum inside <legal_memorandum> tags.
 
-        Remember to provide a thorough and well-reasoned legal analysis, incorporating the relevant legal principles from the statement of law, facts of the case, and application of law to the facts. Your memorandum should demonstrate a clear understanding of the legal issues at hand and provide valuable insights for the reader.
+        Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the
+        relevant law, the facts of this case, and your application of that law to those facts to address the
+        stated legal question. Your memorandum should demonstrate a clear understanding of the legal issues
+        at hand and provide valuable insights for the reader.
 
         Strictly follow the instructions and structure the legal memorandum as per the given format.
     """
+
+
+def get_step_3_input_with_lr(
+    legal_memo, selected_laws, facts, legal, title, content, research
+):
+    return f"""You will be drafting the expanded {title} part of the Analysis section of a legal memorandum. This should be a detailed legal analysis discussing the application of the relevant law to the facts of the case, backed by sound legal reasoning. First, carefully read through the full legal memorandum provided: <legal_memorandum> {legal_memo} </legal_memorandum> Next, review the key statement of law that applies to this case: <statement_of_law> {selected_laws} </statement_of_law>review the legal research material that applies to this case: <legal_research> {research} </legal_research>   Now read through the important facts of the case: <facts_of_the_case> {facts} </facts_of_the_case> Keep in mind that your analysis should address this core legal question: <legal_question> {legal} </legal_question> Re-read the current version of the {title} subsection: {title} {content} Before drafting your expanded subsection, take time in a <scratchpad> to thoroughly analyze how the statement of law, and the legal research material applies to the facts of this case. Consider what legal principles are most relevant from the statement of law and the legal research material and which specific facts are most pertinent. Write out your thought process and reasoning here. Now, please draft the expanded {title} subsection of the legal memorandum in detail: - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law and the legal research material. - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case. - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. Provide your complete draft inside <subsection> tags. Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the relevant law, the facts of this case, and your application of that law to those facts to address the stated legal question. Incorporate your scratchpad notes and reasoning into a polished final subsection draft."""
+
+
+def get_step_3_input_without_lr(
+    legal_memo, selected_laws, facts, legal, title, content
+):
+    return f"""
+        You will be drafting the expanded {title} part of the Analysis section of a legal memorandum. This should be a detailed legal analysis discussing the application of the relevant law to the facts of the case, backed by sound legal reasoning. First, carefully read through the full legal memorandum provided: <legal_memorandum> {legal_memo} </legal_memorandum> Next, review the key statement of law that applies to this case: <statement_of_law> {selected_laws} </statement_of_law> Now read through the important facts of the case: <facts_of_the_case> {facts} </facts_of_the_case> Keep in mind that your analysis should address this core legal question: <legal_question> {legal} </legal_question> Re-read the current version of the {title} subsection: {title} {content} Before drafting your expanded subsection, take time in a <scratchpad> to thoroughly analyze how the statement of law applies to the facts of this case. Consider what legal principles are most relevant from the statement of law and which specific facts are most pertinent. Write out your thought process and reasoning here. Now, please draft the expanded {title} subsection of the legal memorandum in detail: - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law. - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case. - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. Provide your complete draft inside <subsection> tags. Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the relevant law, the facts of this case, and your application of that law to those facts to address the stated legal question. Incorporate your scratchpad notes and reasoning into a polished final subsection draft.
+
+        """
 
 
 def get_step_3_input(legal_memo, selected_laws, facts, legal, title, content):
@@ -341,14 +441,16 @@ def send_legal_memo_basic(legal_memo, *args, **kwargs):
     html_content = render_to_string(
         "email/example.html",
         context={
-            "string": legal_memo.full_legal_memo,
+            "string": legal_memo.full_legal_memo_html,
+            "id": legal_memo.id,
+            "domain_name": settings.ALLOWED_HOSTS[0],
         },
     )
     subject = "Legal Memorandum Basic"
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [
-        "rithikchaudhary150500@gmail.com",
-        "jishnusai99@gmail.com",
+        # "rithikchaudhary150500@gmail.com",
+        # "jishnusai99@gmail.com",
         "iammgautam@gmail.com",
     ]
     message = EmailMultiAlternatives(
@@ -374,13 +476,15 @@ def send_legal_memo_detail(legal_memo, *args, **kwargs):
             "facts": facts,
             "analysis": detailed_analyis,
             "conclusion": conclusion,
+            "id": legal_memo.id,
+            "domain_name": settings.ALLOWED_HOSTS[0],
         },
     )
     subject = "Legal Memorandum Detailed"
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [
-        "rithikchaudhary150500@gmail.com",
-        "jishnusai99@gmail.com",
+        # "rithikchaudhary150500@gmail.com",
+        # "jishnusai99@gmail.com",
         "iammgautam@gmail.com",
     ]
     message = EmailMultiAlternatives(
@@ -505,20 +609,23 @@ def aib_exam_step_2_input(
 
 
 def relevent_topics_input_generator(topics, aib=False):
-    matches_1 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+(Size:\d+)", topics)
-    matches_2 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+-\s+(\d+)", topics)
-    matches_3 = re.findall(r'Topic \d+\.\d+:\s*(.*?)-(\d+)', topics)
-    matches_4 = re.findall(r"Topic \d+\.\d+\s*(.*?)\s+(Size:\d+)", topics)
-    matches_5 = re.findall(r"Topic \d+\.\d+\s*(.*?)-(\d+)", topics)
-    total_matches = matches_1 + matches_2 + matches_3 + matches_4 + matches_5
-    print("OUTPUT::", total_matches)
+    # matches_1 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+(Size:\d+)", topics)
+    # matches_2 = re.findall(r"Topic \d+\.\d+:\s*(.*?)\s+-\s+(\d+)", topics)
+    # matches_3 = re.findall(r'Topic \d+\.\d+:\s*(.*?)-(\d+)', topics)
+    # matches_4 = re.findall(r"Topic \d+\.\d+\s*(.*?)\s+(Size:\d+)", topics)
+    # matches_5 = re.findall(r"Topic \d+\.\d+\s*(.*?)-(\d+)", topics)
+    # total_matches = matches_1 + matches_2 + matches_3 + matches_4 + matches_5
+    pattern = r"Topic\s+(\d+\.\d+)"
+    matches = re.findall(pattern, topics)
+    matches = list(map(float, matches))
+    print("OUTPUT::", matches)
     output = []
-    for match in total_matches:
+    for match in matches:
         # if match[0].startswith('"') or match[0].endswith('"'):
         #     output.append(match.strip('"'))
         # else:
-        output.append(match[0])
-    topics = LawTopics.objects.filter(name__in=output)
+        output.append(match)
+    topics = LawTopics.objects.filter(topic_id__in=matches)
     print("TOPICS::", topics)
     topics_input_value = ""
     for topic in topics:
@@ -536,8 +643,8 @@ def send_aib_mail(aib_answer, *args, **kwargs):
     subject = "AIB Question-Answer by Syndicus"
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [
-        "rithikchaudhary150500@gmail.com",
-        "jishnusai99@gmail.com",
+        # "rithikchaudhary150500@gmail.com",
+        # "jishnusai99@gmail.com",
         "iammgautam@gmail.com",
     ]
     message = EmailMultiAlternatives(
@@ -549,3 +656,112 @@ def send_aib_mail(aib_answer, *args, **kwargs):
         return True
     except EmailBackend.RecipientRefused:
         return False
+
+
+def law_topics_format_generator():
+    parent_objs = LawTopics.objects.filter(parent__isnull=True).prefetch_related(
+        "lawtopics_set"
+    )
+    input_law_topics = ""
+    child_objs_to_update = []
+    for i, parent_obj in enumerate(parent_objs, start=1):
+        input_law_topics += f"Law {i} {parent_obj.name}:\n"
+        for y, child_obj in enumerate(parent_obj.lawtopics_set.all(), start=1):
+            input_law_topics += (
+                f"Topic {i}.{y} {child_obj.name} Size:{child_obj.token_value},\n"
+            )
+            child_obj.topic_id = f"{i}.{y}"
+            child_objs_to_update.append(child_obj)
+    LawTopics.objects.bulk_update(child_objs_to_update, ["topic_id"])
+    return input_law_topics
+
+
+def step_2_output_formatter(string):
+    string = string.replace("&amp;", "&")
+    full_legal_memo_original = re.search(
+        r"&lt;legal_memorandum&gt;(.*?)&lt;\/legal_memorandum&gt;",
+        string,
+        re.DOTALL,
+    ).group(1)
+    string = string.replace("<br>", "")
+    if "!%!Question Presented!%!" in string or "Question Presented" in string:
+        string = string.replace(
+            "!%!Question Presented!%!", "<h2><b>Question Presented</b></h2>"
+        ).replace("Question Presented", "<h2><b>Question Presented</b></h2>")
+
+    if "!%!Statement of Facts!%!" in string or "Statement of Facts" in string:
+        string = string.replace(
+            "!%!Statement of Facts!%!", "<h2><b>Statement of Facts</b></h2>"
+        ).replace("Statement of Facts", "<h2><b>Statement of Facts</b></h2>")
+
+    if "!%!Analysis!%!" in string or "Analysis" in string:
+        string = string.replace("!%!Analysis!%!", "<h2><b>Analysis</b></h2>").replace(
+            "Analysis", "<h2><b>Analysis</b></h2>"
+        )
+
+    if "!%!Conclusion!%!" in string or "Conclusion" in string:
+        string = string.replace(
+            "!%!Conclusion!%!", "<h2><b>Conclusion</b></h2>"
+        ).replace("Conclusion", "<h2><b>Conclusion</b></h2>")
+    full_legal_memo_html = re.search(
+        r"&lt;legal_memorandum&gt;(.*?)&lt;\/legal_memorandum&gt;",
+        string,
+        re.DOTALL,
+    ).group(1)
+    pattern = r"\|\$\|(.*?)\|\$\|"
+    matches = re.findall(pattern, full_legal_memo_html)
+    for title in matches:
+        full_legal_memo_html = full_legal_memo_html.replace(
+            f"|$|{title}|$|", f"<b>{title}<b>"
+        )
+    legal = re.search(
+        r"!%!Question Presented!%!(.*?)!%!Statement of Facts!%!",
+        full_legal_memo_original,
+        re.DOTALL,
+    ).group(1)
+
+    facts = re.search(
+        r"!%!Statement of Facts!%!(.*?)!%!Analysis!%!",
+        full_legal_memo_original,
+        re.DOTALL,
+    ).group(1)
+
+    analysis = re.search(
+        r"!%!Analysis!%!(.*?)!%!Conclusion!%!",
+        full_legal_memo_original,
+        re.DOTALL,
+    ).group(1)
+    pattern = r"\|\$\|(.*?)\|\$\|"
+    matches = re.findall(pattern, full_legal_memo_original)
+    analysis = []
+    print("STRING::::", full_legal_memo_original)
+    for title in matches:
+        pattern = rf"\|\$\|{title}\|\$\|(.*?)\|\$\|"
+        if title == matches[-1]:
+            print("TITLE:::", title)
+            pattern = rf"\|\$\|{title}\|\$\|(.*?)!%!Conclusion!%!"
+        content_match = re.search(pattern, full_legal_memo_original, re.DOTALL).group(1)
+        title = title.replace("<h2>", "")
+        title = title.replace("</h2>", "")
+        title = title.replace("<b>", "")
+        title = title.replace("</b>", "")
+        content_match = content_match.replace("<h2>", "")
+        content_match = content_match.replace("</h2>", "")
+        content_match = content_match.replace("<b>", "")
+        content_match = content_match.replace("<b>", "")
+        analysis.append({"title": title, "content": content_match})
+
+    conclusion = re.search(
+        r"!%!Conclusion!%!(.*)",
+        full_legal_memo_original,
+        re.DOTALL,
+    ).group(1)
+
+    return (
+        full_legal_memo_original,
+        full_legal_memo_html,
+        legal,
+        facts,
+        analysis,
+        conclusion,
+    )

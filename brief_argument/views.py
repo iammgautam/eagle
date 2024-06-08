@@ -2,7 +2,7 @@ import re
 import json
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import get_token
-from rest_framework.decorators import action
+from django.utils.safestring import mark_safe
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,14 +20,18 @@ from case_history.models import LawTopics
 from .utils import (
     INPUT_TOPICS,
     get_step_1_input,
-    get_step_2_input,
-    get_step_3_input,
+    get_step_2_input_with_lr,
+    get_step_2_input_without_lr,
+    get_step_3_input_with_lr,
+    get_step_3_input_without_lr,
     send_legal_memo_basic,
     send_legal_memo_detail,
     aib_exam__step_1_input,
     aib_exam_step_2_input,
     relevent_topics_input_generator,
     send_aib_mail,
+    step_2_output_formatter,
+    # law_topics_format_generator
 )
 
 
@@ -59,8 +63,8 @@ class ArgumentViewSet(viewsets.ModelViewSet):
         # send mail (detailed legal_memo)
         send_legal_memo_detail(legal_memo)
 
-        # legal_memo.case_history.is_completed = True
-        # legal_memo.case_history.save()
+        legal_memo.case_history.is_completed = True
+        legal_memo.case_history.save()
 
         return HttpResponseRedirect(
             reverse(
@@ -108,14 +112,14 @@ class AIBExammViewsets(viewsets.ModelViewSet):
         aib_exam_obj = self.get_object()
         if request.data.get("step_2") == True:
             send_aib_mail(request.data.get("aib_final_result"))
-            aib_exam_obj.is_completed=True
+            aib_exam_obj.is_completed = True
             aib_exam_obj.save()
             print("It is working::")
             return HttpResponseRedirect(
-            reverse(
-                "brief_argument:aib_exam_admin_page",
+                reverse(
+                    "brief_argument:aib_exam_admin_page",
+                )
             )
-        )
         aib_relevant_topic_content = relevent_topics_input_generator(
             request.data.get("aib_relevant_topics"), aib=True
         )
@@ -171,7 +175,7 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
             facts,
             analysis,
             conclusion,
-        ) = self.counsel_formatter(request.data.get("counsel_output"))
+        ) = step_2_output_formatter(request.data.get("counsel_output"))
         legal_memo_obj = self.get_object()
         if legal_memo_obj is None:
             return Response(
@@ -201,105 +205,9 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
             )
         )
 
-    def counsel_formatter(self, string):
-        full_legal_memo_original = re.search(
-            r"&lt;legal_memorandum&gt;(.*?)&lt;\/legal_memorandum&gt;",
-            string,
-            re.DOTALL,
-        ).group(1)
-        string = string.replace("<br>", "")
-        if "!%!Question Presented!%!" in string or "Question Presented" in string:
-            string = string.replace(
-                "!%!Question Presented!%!", "<h2><b>Question Presented</b></h2>"
-            ).replace("Question Presented", "<h2><b>Question Presented</b></h2>")
-
-        if "!%!Statement of Facts!%!" in string or "Statement of Facts" in string:
-            string = string.replace(
-                "!%!Statement of Facts!%!", "<h2><b>Statement of Facts</b></h2>"
-            ).replace("Statement of Facts", "<h2><b>Statement of Facts</b></h2>")
-
-        if "!%!Analysis!%!" in string or "Analysis" in string:
-            string = string.replace(
-                "!%!Analysis!%!", "<h2><b>Analysis</b></h2>"
-            ).replace("Analysis", "<h2><b>Analysis</b></h2>")
-
-        if "!%!Conclusion!%!" in string or "Conclusion" in string:
-            string = string.replace(
-                "!%!Conclusion!%!", "<h2><b>Conclusion</b></h2>"
-            ).replace("Conclusion", "<h2><b>Conclusion</b></h2>")
-        full_legal_memo_html = re.search(
-            r"&lt;legal_memorandum&gt;(.*?)&lt;\/legal_memorandum&gt;",
-            string,
-            re.DOTALL,
-        ).group(1)
-        pattern = r"\|\$\|(.*?)\|\$\|"
-        matches = re.findall(pattern, full_legal_memo_html)
-        for title in matches:
-            full_legal_memo_html = full_legal_memo_html.replace(
-                f"|$|{title}|$|", f"<b>{title}<b>"
-            )
-        # print("STRING:::", string)
-        legal = re.search(
-            r"Question Presented(.*?)Statement of Facts",
-            string,
-            re.DOTALL,
-        ).group(1)
-
-        facts = re.search(
-            r"Statement of Facts(.*?)Analysis",
-            string,
-            re.DOTALL,
-        ).group(1)
-
-        analysis = re.search(
-            r"Analysis(.*?)Conclusion",
-            string,
-            re.DOTALL,
-        ).group(1)
-        pattern = r"\|\$\|(.*?)\|\$\|"
-        matches = re.findall(pattern, string)
-        analysis = []
-        for title in matches:
-            pattern = rf"\|\$\|{title}\|\$\|(.*?)\|\$\|"
-            if title == matches[-1]:
-                pattern = rf"\|\$\|{title}\|\$\|(.*?)Conclusion"
-            content_match = re.search(pattern, string, re.DOTALL).group(1)
-            analysis.append({"title": title, "content": content_match})
-
-        conclusion = re.search(
-            r"Conclusion(.*?)&lt;\/legal_memorandum&gt;",
-            string,
-            re.DOTALL,
-        ).group(1)
-
-        return (
-            full_legal_memo_original,
-            full_legal_memo_html,
-            legal,
-            facts,
-            analysis,
-            conclusion,
-        )
-
-    def relevent_topics_input_generator(self, topics):
-        pattern = r"\d+\.\d+:\s*(.*?)-\d+"
-        matches = re.findall(pattern, topics)
-        output = [match for match in matches]
-        output = []
-        for match in matches:
-            if match.startswith('"') and match.endswith('"'):
-                output.append(match.strip('"'))
-            else:
-                output.append(match)
-
-        topics = LawTopics.objects.filter(name__in=output)
-        topics_input_value = ""
-        for topic in topics:
-            topics_input_value += f"<{topic.name}>{topic.content}</{topic.name}>"
-        return topics_input_value
-
 
 def main_page(request):
+    # print(law_topics_format_generator())
     csrf_token = get_token(request)
     return render(request, "brief_argument/main_page.html", {"csrf_token": csrf_token})
 
@@ -317,26 +225,22 @@ def step_1(request, case_id):
     return render(request, "brief_argument/step_1.html", context)
 
 
-def law_topics_format_generator():
-    parent_objs = LawTopics.objects.filter(parent__isnull=True)
-    input_law_topics = ""
-    for i, parent_obj in enumerate(parent_objs, start=1):
-        input_law_topics += f"Law {i} {parent_obj.name}:\n"
-        for y, child_obj in enumerate(parent_obj.lawtopics_set.all(), start=1):
-            input_law_topics += (
-                f"Topic {i}.{y} {child_obj.name} Size:{child_obj.token_value},\n"
-            )
-    return input_law_topics
-
-
 def step_2(request, legal_memo_id):
     legal_memo = Legal_Memorandum.objects.get(id=legal_memo_id)
     csrf_token = get_token(request)
-    system_instruction = get_step_2_input(
-        legal_memo.relevant_topics,
-        legal_memo.case_history.fact_case,
-        legal_memo.case_history.legal_issue,
-    )
+    if legal_memo.case_history.legal_research:
+        system_instruction = get_step_2_input_with_lr(
+            relevent_topics=legal_memo.relevant_topics,
+            facts=legal_memo.case_history.fact_case,
+            legal=legal_memo.case_history.legal_issue,
+            research=legal_memo.case_history.legal_research,
+        )
+    else:
+        system_instruction = get_step_2_input_without_lr(
+            relevent_topics=legal_memo.relevant_topics,
+            facts=legal_memo.case_history.fact_case,
+            legal=legal_memo.case_history.legal_issue,
+        )
     context = {
         "csrf_token": csrf_token,
         "input_1": system_instruction,
@@ -348,7 +252,7 @@ def step_3(request, legal_memo_id):
     # optimize the query using Prefetch
     legal_memo = (
         Legal_Memorandum.objects.filter(id=legal_memo_id)
-        .prefetch_related("analysis")
+        .prefetch_related("analysis", "case_history")
         .first()
     )
     facts = legal_memo.case_history.fact_case
@@ -356,20 +260,36 @@ def step_3(request, legal_memo_id):
     relevent_topics = legal_memo.relevant_topics
     legal_memo_original = legal_memo.full_legal_memo_original
     total_input = []
+    is_legal_research_present = bool(legal_memo.case_history.legal_research)
     for anal in legal_memo.analysis.all():
-        total_input.append(
-            {
-                "ids": anal.id,
-                "input": get_step_3_input(
-                    legal_memo_original,
-                    relevent_topics,
-                    facts,
-                    legal,
-                    anal.title,
-                    anal.content,
-                ),
-            }
-        )
+        if is_legal_research_present:
+            total_input.append(
+                {
+                    "ids": anal.id,
+                    "input": get_step_3_input_with_lr(
+                        legal_memo_original,
+                        relevent_topics,
+                        facts,
+                        legal,
+                        anal.title,
+                        anal.content,
+                    ),
+                }
+            )
+        else:
+            total_input.append(
+                {
+                    "ids": anal.id,
+                    "input": get_step_3_input_without_lr(
+                        legal_memo_original,
+                        relevent_topics,
+                        facts,
+                        legal,
+                        anal.title,
+                        anal.content,
+                    ),
+                }
+            )
     step_3_input_json = json.dumps(total_input)
     csrf_token = get_token(request)
     context = {
@@ -403,7 +323,6 @@ def aib_exam(request):
 
 
 def aib_step_1(request, aib_exam_id):
-    # print(law_topics_format_generator())
     aib_exam = AIB_EXAM.objects.get(id=aib_exam_id)
     input = aib_exam__step_1_input(
         aib_exam.question,
@@ -447,3 +366,34 @@ def aib_exam_adim_page(request):
         "count": count,
     }
     return render(request, "brief_argument/aib_exam_admin.html", context)
+
+
+def legal_memo_frontend(request, legal_memo_id):
+    legal_memo = (
+        Legal_Memorandum.objects.filter(id=legal_memo_id)
+        .prefetch_related("analysis", "case_history")
+        .first()
+    )
+    legal = legal_memo.legal
+    facts = legal_memo.facts
+    title = legal_memo.case_history.legal_issue
+    analysis = []
+    for anal in legal_memo.analysis.all():
+        analysis.append(
+            {
+                "title": anal.title,
+                "content": anal.detailed_content,
+            }
+        )
+    conclusion = legal_memo.conclusion
+    legal = legal.replace("'", "\\'")
+    facts = facts.replace("'", "\\'")
+    conclusion = conclusion.replace("'", "\\'")
+    context = {
+        "title": mark_safe(title),
+        "legal": mark_safe(legal),
+        "facts": mark_safe(facts),
+        "detailed_analyis": json.dumps(analysis),
+        "conclusion": mark_safe(conclusion),
+    }
+    return render(request, "brief_argument/legal_memo_fe.html", context)

@@ -5,7 +5,7 @@ from .models import Argument, Legal_Memorandum, AIB_EXAM
 # Register your models here.
 @admin.register(Argument)
 class ArgumentAdmin(admin.ModelAdmin):
-    list_display = ("content", "created_date")
+    list_display = ("title", "created_date")
     list_filter = ("created_date",)
     search_fields = ("content",)
 

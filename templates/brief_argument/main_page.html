@@ -24,10 +24,6 @@
         filter: drop-shadow(0 0 2em #42b883aa);
     }
 
-    .respondentRef .petitionerRef textarea {
-        font-family: "Inter", sans-serif;
-    }
-
     .casefacts textarea {
         font-family: "Inter", sans-serif;
     }
@@ -38,177 +34,105 @@
 </style>
 
 <body v-cloak>
-    <div id="app" class="bg-white font-epilogue">
-        <h1 class="text-xl sm:text-2xl md:text-3xl font-regular text-black px-4 sm:px-8 py-4 relative">
-            <span class="relative block">
-                <span class="relative z-10">Enter the case title, facts and the legal issue</span>
-                <span
-                    class="absolute left-3 sm:left-4 -top-1 sm:-top-3 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#70D5FF] rounded-full opacity-80 z-0"></span>
-            </span>
-        </h1>
+    <div id="app" class="bg-white font-epilogue px-4 sm:px-8 py-4">
         <form class="px-4 sm:px-8 py-4">
-            <div class="casetitle">
-                <h1 class="text-lg sm:text-xl md:text-2xl font-regular text-black mt-4 mb-4 relative">
-                    <span class="relative block">
-                        <h2 class="text-zinc-500 text-sm" style="font-family: Inter, sans-serif">CASE TITLE</h2>
-                    </span>
-                </h1>
-                <div class="flex flex-col md:flex-row items-center justify-between">
-                    <div class="w-full md:w-auto">
-                        <textarea name="petitionerName" ref="petitionerRef" v-model="caseDetail.petitioner_name"
-                            class="w-full md:w-[200px] lg:w-[420px] h-14 p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none overflow-hidden"
-                            placeholder="Petitioner's Name" style="font-size: 20px"></textarea>
+            <div class="legalissue">
+                <div class="flex flex-col items-center">
+                    <div class="w-full md:w-2/3 relative">
+                        <h2 class="text-zinc-500 text-sm mb-2 font-inter">LEGAL ISSUE</h2>
+                        <textarea v-model="caseDetail.legal_issue" name="legalIssue" ref="legalIssueRef"
+                            class="w-full h-24 sm:h-32 md:h-40 lg:h-48 p-4 text-l font-semibold placeholder-zinc-500 rounded-lg resize-none"
+                            placeholder="What is the legal issue?" style="font-size: 28px"></textarea>
                     </div>
-                    <div class="mx-2 text-xl sm:text-2xl font-bold">v.</div>
-                    <div class="w-full md:w-auto">
-                        <textarea name="respondentName" ref="respondentRef" v-model="caseDetail.respondent_name"
-                            class="w-full md:w-[200px] lg:w-[420px] h-14 p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none overflow-hidden"
-                            placeholder="Respondent's Name" style="font-size: 20px"></textarea>
-                    </div>
-                    <div class="mx-2 text-xl sm:text-2xl font-bold">in</div>
-                    <div class="w-full md:w-auto">
-                        <div class="w-full md:w-[200px] lg:w-[420px] h-14 p-4 mb-2 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none"
-                            style="font-size: 20px" @click.stop="showCourtDropdown = !showCourtDropdown">
-                            [[ selectedCourt ]]
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
+                <div class="casefacts">
+                    <h1 class="text-lg sm:text-xl md:text-2xl font-regular text-black mb-4 relative">
+                        <span class="relative block">
+                            <h2 class="text-zinc-700 text-sm" style="font-family: Inter, sans-serif">FACTS</h2>
+                            <h2 class="text-zinc-500 text-sm bb-2" style="font-family: Inter, sans-serif">Please enter
+                                the
+                                brief facts
+                                of the case. You can type or paste relevant information, or upload documents such as
+                                First
+                                Information
+                                Reports, charge sheets, witness statements, and post-mortem reports.</h2>
+                        </span>
+                    </h1>
+                    <!-- <div class="mb-4">
+                    <label for="factsFiles" class="sr-only">Choose files</label>
+                    <input type="file" name="factsFiles" id="factsFiles" multiple
+                      class="block w-full border border-gray-200 shadow-sm rounded-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none file:bg-gray-50 file:border-0 file:me-4 file:py-3 file:px-4"
+                      accept=".pdf" />
+                  </div> -->
+                    <div class="flex flex-col relative">
+                        <div class="w-full">
+                            <textarea name="caseFacts" ref="caseFactsRef"
+                                class="w-full h-[280px] sm:h-[280px] lg:h-[300px] p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none focus:outline-none focus:ring-2"
+                                :class="{ 'focus:ring-red-400': FactwordLimitExceeded }"
+                                placeholder="Type the facts of the case" style="font-size: 20px"
+                                @input="updateFactWordCount" v-model="caseDetail.fact_case"></textarea>
                         </div>
-                        <div v-if="showCourtDropdown"
-                            class="fixed top-0 right-0 w-full h-full z-50 flex justify-end pt-20"
-                            @click.self="showCourtDropdown = false">
-                            <div
-                                class="bg-white rounded-lg shadow-lg p-6 w-full sm:w-[460px] max-h-190 overflow-y-auto custom-scrollbar">
-                                <input type="text" v-model="courtSearchQuery" placeholder="Search for high courts"
-                                    @input="filterCourts"
-                                    class="w-full mb-4 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                <ul class="court-list">
-                                    <li v-for="(court, index) in visibleCourts" :key="court"
-                                        @click="selectCourt(court);showCourtDropdown = false;"
-                                        :class="{ 'selected-court': selectedCourt === court }"
-                                        class="cursor-pointer py-2 px-4 rounded-lg hover:text-[#050142] hover:font-medium transition-colors text-[#686868]"
-                                        :style="{ animationDelay: `${index * 0.1}s` }">
-                                        [[ court ]]
-                                    </li>
-                                </ul>
-                            </div>
+                        <div class="absolute bottom-2 right-4 text-gray-400">
+                            [[ FactswordCount ]]/25000
+                        </div>
+                    </div>
+                </div>
+                <div class="legalresearch">
+                    <h1 class="text-lg sm:text-xl md:text-2xl font-regular text-black mb-4 relative">
+                        <span class="relative block">
+                            <h2 class="text-zinc-700 text-sm" style="font-family: Inter, sans-serif">LEGAL RESEARCH</h2>
+                            <h2 class="text-zinc-500 text-sm mb-2" style="font-family: Inter, sans-serif">Please provide
+                                relevant case
+                                law or legal judgments you wish to include in your legal memorandum. You can include
+                                specific case
+                                details, citations, or any pertinent legal decisions that support your legal memorandum.
+                            </h2>
+                        </span>
+                    </h1>
+                    <!-- <div class="mb-4">
+                    <label for="researchFiles" class="sr-only">Choose files</label>
+                    <input type="file" name="researchFiles" id="researchFiles" multiple
+                      class="block w-full border border-gray-200 shadow-sm rounded-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none file:bg-gray-50 file:border-0 file:me-4 file:py-3 file:px-4"
+                      accept=".pdf" />
+                  </div> -->
+                    <div class="flex flex-col relative">
+                        <div class="w-full">
+                            <textarea name="legalResearch" ref="legalResearchRef"
+                                class="w-full h-[280px] sm:h-[280px] lg:h-[300px] p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none focus:outline-none focus:ring-2"
+                                :class="{ 'focus:ring-red-400': LegalResearchwordLimitExceeded }"
+                                placeholder="Add legal research" style="font-size: 20px" @input="updateLegalResearchWordCount"
+                                v-model="caseDetail.legal_research"></textarea>
+                        </div>
+                        <div class="absolute bottom-2 right-4 text-gray-400">
+                            [[ LegalResearchswordCount ]]/25000
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="casefacts">
-                    <h1 class="text-lg sm:text-xl md:text-2xl font-regular text-black mt-10 mb-4 relative">
-                        <span class="relative block">
-                            <h2 class="text-zinc-500 text-sm" style="font-family: Inter, sans-serif">BRIEF FACT</h2>
-                        </span>
-                    </h1>
-                    <div class="flex flex-col relative">
-                        <div class="w-full">
-                            <textarea name="caseFacts" ref="caseFactsRef" v-model="caseDetail.fact_case"
-                                class="w-full h-[300px] sm:h-[400px] lg:h-[500px] p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none focus:outline-none focus:ring-2"
-                                :class="{ 'focus:ring-red-400': wordLimitExceeded }"
-                                placeholder="Type the facts of the case" style="font-size: 20px"
-                                @input="updateWordCount"></textarea>
-                        </div>
-                        <div class="absolute bottom-2 right-4 text-gray-400">
-                            [[ wordCount ]]/25000
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-8">
-                    <div class="legalissue">
-                        <h1 class="text-lg sm:text-xl md:text-2xl font-regular text-black mt-10 mb-4 relative">
-                            <span class="relative block">
-                                <h2 class="text-zinc-500 text-sm" style="font-family: Inter, sans-serif">LEGAL ISSUE
-                                </h2>
-                            </span>
-                        </h1>
-                        <div class="flex flex-col">
-                            <div class="w-full">
-                                <textarea name="legalIssue" ref="legalIssueRef" v-model="caseDetail.legal_issue"
-                                    class="w-full h-24 sm:h-32 md:h-40 lg:h-[90px] p-4 text-l placeholder-zinc-500 border border-black rounded-lg bg-[#fffbf7] bg-opacity-25 shadow-lg resize-none"
-                                    placeholder="What is the legal issue?" style="font-size: 20px"></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <!-- <div class="max-w-full">
-                            <div class="mb-2">
-                                <h2 class="text-zinc-500 text-sm" style="font-family: Inter, sans-serif">ATTACHMENT</h2>
-                                <p class="text-zinc-500 text-xs">Upload any relevant files of the case</p>
-                            </div>
-                            <label for="file-input-1" class="sr-only">Choose file 1</label>
-                            <input type="file" name="file-input-1" id="file-input-1"
-                                class="block w-full border border-gray-200 shadow-sm rounded-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 file:bg-gray-50 file:border-0 file:me-4 file:py-3 file:px-4 dark:file:bg-neutral-700 dark:file:text-neutral-400"
-                                accept=".pdf" @change="validateFile('fileError1', $event)" />
-                            <div v-if="fileError1" class="text-red-500 mt-2">{{ fileError1 }}</div>
-                            <div class="mt-4 mb-2">
-                                <h2 class="text-zinc-500 text-sm" style="font-family: Inter, sans-serif">RESEARCH</h2>
-                                <p class="text-zinc-500 text-xs">Upload any relevant files of the case</p>
-                            </div>
-                            <label for="file-input-2" class="sr-only mt-4">Choose file 2</label>
-                            <input type="file" name="file-input-2" id="file-input-2"
-                                class="block w-full border border-gray-200 shadow-sm rounded-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 file:bg-gray-50 file:border-0 file:me-4 file:py-3 file:px-4 dark:file:bg-neutral-700 dark:file:text-neutral-400"
-                                accept=".pdf" @change="validateFile('fileError2', $event)" />
-                            <div v-if="fileError2" class="text-red-500 mt-2">{{ fileError2 }}</div>
-                            <p class="text-zinc-500 text-xs mt-3">**please do not upload any files as they are not
-                                processed</p>
-                        </div> -->
-                        <div class="flex flex-col items-start mt-10">
-                            <div class="flex flex-col sm:flex-row justify-start">
-                                <button
-                                    class="flex items-center justify-center text-l text-[#1C175C] rounded-full px-6 py-3 mr-4 mb-4 sm:mb-0 border border-solid border-[#1C175C]"
-                                    @click.prevent="submitForm('petitioner')">
-                                    Generate Memo
-                                </button>
-                            </div>
-                            <br>
-                            <div class="flex flex-col sm:flex-row justify-start">
-                                <a
-                                    href="{% url 'brief_argument:aib_exam' %}"
-                                    class="flex items-center justify-center text-l text-[#1C175C] rounded-full px-6 py-3 mr-4 mb-4 sm:mb-0 border border-solid border-[#1C175C]">
-                                    AIB
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
+            <div class="flex justify-center mt-6">
+                <button class="bg-[#050142] text-[#C3E2EF] px-6 py-3 rounded-full text-l"
+                    @click.prevent="submitForm()">
+                    Generate Memo
+                </button>
+                <div class="flex flex-col sm:flex-row justify-start px-2">
+                    <a href="{% url 'brief_argument:aib_exam' %}"
+                        class="flex items-center justify-center text-l text-[#1C175C] rounded-full px-6 py-3 mr-4 mb-4 sm:mb-0 border border-solid border-[#1C175C]">
+                        AIB Exam
+                    </a>
                 </div>
             </div>
         </form>
 
-        <!-- Contact and Feedback buttons -->
-        <!-- <div class="fixed bottom-4 right-4 flex">
-            <div class="relative">
-                <button class="text-sm text-gray-500 hover:text-black hover:underline" @click="showContactPopup = true">
-                    Contact
-                </button>
-                <div v-if="showContactPopup"
-                    class="absolute bottom-full left-1/2 transform -translate-x-1/2 bg-white p-4 rounded-md shadow-md">
-                    <p>Contact Information:</p>
-                    <p>Email: contact@example.com</p>
-                    <p>Phone: 123-456-7890</p>
-                    <button class="mt-2 text-sm text-gray-500 hover:text-black hover:underline"
-                        @click="showContactPopup = false">
-                        Close
-                    </button>
-                </div>
-            </div>
-            <a href="https://example.com/feedback" target="_blank"
-                class="ml-4 text-sm text-gray-500 hover:text-black hover:underline">
-                Feedback
-            </a>
-        </div> -->
-
-        <!-- Email Confirmation Popup -->
+        <!-- Validation Popup -->
         <div id="EmailPopup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center">
                 <img src="{%static 'a71836da-b37e-4f13-baf0-c782e80e982b.png' %}" alt="Logo" class="w-20 h-20 mb-4">
                 <p class="text-lg text-center mb-4">You will receive an email at the address you used to sign up within
                     30 to 45
                     minutes. Please check your email and follow the instructions.</p>
-                <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="closeEmail()">
+                <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="close('EmailPopup')">
                     Okay, I will check my email in 30-45 minutes
                 </button>
             </div>
@@ -217,23 +141,32 @@
             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center">
                 <img alt="Logo" class="w-20 h-20 mb-4">
-                <p class="text-lg text-center mb-4">Please Fill the Values for Petitioner Name, Respondent Name, Fact of
-                    the case and Legal Issue.</p>
+                <p class="text-lg text-center mb-4">Please Fill the Values for Legal Issue,Facts and Legal Research.</p>
                 <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="close('validationCheck')">
                     Okay
                 </button>
             </div>
         </div>
-        <div id="wordCount_id"
+        <div id="factWordCount_id"
             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center">
                 <img alt="Logo" class="w-20 h-20 mb-4">
-                <p class="text-lg text-center mb-4">Brief Fact Word COunt Must not be more than 25000 words.</p>
-                <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="close('wordCount_id')">
+                <p class="text-lg text-center mb-4">Brief Fact Word Count Must not be more than 25000 words.</p>
+                <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="close('factWordCount_id')">
                     Okay
                 </button>
             </div>
         </div>
+        <!-- <div id="LegalResearchWordCount_id"
+            class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center">
+                <img alt="Logo" class="w-20 h-20 mb-4">
+                <p class="text-lg text-center mb-4">Brief Legal Research Word Count Must not be more than 25000 words.</p>
+                <button class="bg-[#050142] text-[#C3E2EF] px-4 py-2 rounded-md" @click="close('LegalResearchWordCount_id')">
+                    Okay
+                </button>
+            </div>
+        </div> -->
 
     </div>
 </body>
@@ -242,80 +175,32 @@
 <script>
     const { createApp, ref, onMounted, computed } = Vue
     const csrftoken = '{{ csrf_token }}';
-    const highCourts = [
-        "Supreme Court of India",
-        "Allahabad High Court",
-        "Andhra Pradesh High Court",
-        "Bombay High Court",
-        "Calcutta High Court",
-        "Chhattisgarh High Court",
-        "Delhi High Court",
-        "Gauhati High Court",
-        "Gujarat High Court",
-        "Himachal Pradesh High Court",
-        "Jammu and Kashmir High Court",
-        "Jharkhand High Court",
-        "Karnataka High Court",
-        "Kerala High Court",
-        "Madhya Pradesh High Court",
-        "Madras High Court",
-        "Manipur High Court",
-        "Meghalaya High Court",
-        "Orissa High Court",
-        "Patna High Court",
-        "Punjab and Haryana High Court",
-        "Rajasthan High Court",
-        "Sikkim High Court",
-        "Telangana High Court",
-        "Tripura High Court",
-        "Uttarakhand High Court",
-    ];
-
     const app = createApp({
         setup() {
             const caseDetail = ref({
-                petitioner_name: '',
-                respondent_name: '',
                 fact_case: '',
                 legal_issue: '',
-                submit_type: '',
+                legal_research: '',
             });
             const caseFactsRef = ref(null);
+            const legalResearchRef = ref(null);
             const validationError = ref(false);
-            const showCourtDropdown = ref(false);
-            const selectedCourt = ref(null);
-            const courtSearchQuery = ref("");
-            const visibleCourts = ref(highCourts);
             const showEmailPopup = ref(false);
-            const apiCallMade = ref(false);
-            const wordLimitExceeded = ref(false);
+            const FactwordLimitExceeded = ref(false);
+            const LegalResearchwordLimitExceeded = ref(false);
 
             onMounted(() => {
                 window.scrollTo(0, 0);
             });
 
-            const filterCourts = () => {
-
-                const query = courtSearchQuery.value.toLowerCase();
-                visibleCourts.value = highCourts.filter((court) =>
-                    court.toLowerCase().includes(query)
-                );
-            };
-            const selectCourt = (court) => {
-                selectedCourt.value = court;
-            };
-            const submitForm = async (submit_type) => {
+            const submitForm = async () => {
                 validationCheck();
                 if (validationError.value === false) {
                     const requestData = {
-                        petitioner_name: caseDetail.value.petitioner_name,
-                        respondent_name: caseDetail.value.respondent_name,
                         fact_case: caseDetail.value.fact_case,
                         legal_issue: caseDetail.value.legal_issue,
-                        high_court: selectedCourt.value
+                        legal_research: caseDetail.value.legal_research,
                     };
-                    console.log("Details::", requestData);
-                    apiCallMade.value = true;
                     axios.post('/api/casehistories/', requestData, {
                         headers: {
                             'X-CSRFToken': csrftoken
@@ -332,11 +217,6 @@
 
                 }
             };
-            const closeEmail = () => {
-                const modal = document.getElementById('EmailPopup');
-                modal.classList.remove('block');
-                modal.classList.add('hidden');
-            };
             const close = (value) => {
                 const modal = document.getElementById(value);
                 modal.classList.remove('block');
@@ -344,13 +224,18 @@
             };
             const validationCheck = () => {
                 validationError.value = false;
-                if (wordLimitExceeded.value === true) {
+                if (FactwordLimitExceeded.value === true) {
                     validationError.value = true;
-                    const modal = document.getElementById('wordCount_id');
+                    const modal = document.getElementById('factWordCount_id');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('block');
+                }if (LegalResearchwordLimitExceeded.value === true) {
+                    validationError.value = true;
+                    const modal = document.getElementById('LegalResearchWordCount_id');
                     modal.classList.remove('hidden');
                     modal.classList.add('block');
                 } else {
-                    for (const key of ['petitioner_name', 'respondent_name', 'fact_case', 'legal_issue']) {
+                    for (const key of ['fact_case', 'legal_issue']) {
                         if (!caseDetail.value[key]) {
                             validationError.value = true;
                             const modal = document.getElementById('validationCheck');
@@ -360,40 +245,52 @@
                     }
                 }
             };
-            const wordCount = computed(() => {
+            const FactswordCount = computed(() => {
                 if (caseDetail.value.fact_case) {
                     const words = caseDetail.value.fact_case.trim().split(/\s+/);
                     return words.length;
                 }
+                return 0
             });
-            const updateWordCount = () => {
-                if (wordCount.value > 25000) {
-                    wordLimitExceeded.value = true;
+            const updateFactWordCount = () => {
+                if (FactswordCount.value > 25000) {
+                    FactwordLimitExceeded.value = true;
                     caseDetail.value.fact_case = caseDetail.value.fact_case.slice(0, -1);
                     caseFactsRef.value?.classList.add("focus-ring-red");
                 } else {
-                    wordLimitExceeded.value = false;
+                    FactwordLimitExceeded.value = false;
                     caseFactsRef.value?.classList.remove("focus-ring-red");
                 }
             };
-
+            const LegalResearchswordCount = computed(() => {
+                if (caseDetail.value.legal_research) {
+                    const words = caseDetail.value.legal_research.trim().split(/\s+/);
+                    return words.length;
+                }
+                return 0
+            });
+            const updateLegalResearchWordCount = () => {
+                if (LegalResearchswordCount.value > 25000) {
+                    LegalResearchwordLimitExceeded.value = true;
+                    caseDetail.value.legal_research = caseDetail.value.legal_research.slice(0, -1);
+                    legalResearchRef.value?.classList.add("focus-ring-red");
+                } else {
+                    LegalResearchwordLimitExceeded.value = false;
+                    legalResearchRef.value?.classList.remove("focus-ring-red");
+                }
+            };
             return {
                 caseDetail,
-                showCourtDropdown,
-                selectedCourt,
-                courtSearchQuery,
-                visibleCourts,
-                filterCourts,
-                selectCourt,
-                highCourts,
                 submitForm,
                 showEmailPopup,
-                closeEmail,
                 validationCheck,
                 close,
-                updateWordCount,
-                wordCount,
-                wordLimitExceeded,
+                updateFactWordCount,
+                FactswordCount,
+                FactwordLimitExceeded,
+                updateLegalResearchWordCount,
+                LegalResearchswordCount,
+                LegalResearchwordLimitExceeded,
             }
         }
     })
