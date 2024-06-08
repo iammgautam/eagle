@@ -31,7 +31,7 @@ from .utils import (
     relevent_topics_input_generator,
     send_aib_mail,
     step_2_output_formatter,
-    # law_topics_format_generator
+    law_topics_format_generator
 )
 
 
