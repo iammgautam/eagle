@@ -16,6 +16,12 @@
     {% else %}
     <p>No case history found.</p>
     {% endif %}
+    {% for statent in Values %}
+    <p>{{statent.book_id}}</p>
+    <p>{{statent.name}}</p>
+    <p>{{statent.statement}}</p>
+    <p>{{statent.citation_list}}</p>
+    {% endfor %}
 </body>
 
 </html>

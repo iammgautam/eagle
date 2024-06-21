@@ -1,4 +1,5 @@
 from django.db import models
+from pgvector.django import VectorField
 from django.utils.translation import gettext as _
 import uuid
 from brief_argument.models import Legal_Memorandum
@@ -29,5 +30,13 @@ class LawTopics(models.Model):
     
 class HighCourts(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
+    created_date = models.DateTimeField(auto_now_add=True)
+    modified_date = models.DateTimeField(auto_now=True)
+
+
+class LegalSearchHistory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    search_text = models.TextField(null=True, blank=True)
+    embeddings = VectorField(dimensions=3072)
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)

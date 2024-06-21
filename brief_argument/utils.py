@@ -1,10 +1,18 @@
 import re
+import docx
+import os
+import google.generativeai as genai
+import lxml.etree
+import numpy as np
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
+from brief_argument.scraper2 import run_playwright
 from legal_gpt import settings
 from case_history.models import LawTopics
+from brief_argument.models import HulsburyLawBooks, Case, CaseNote, Caseparagraph
 from legal_gpt import settings
+from .main3 import final_function, process_documents, process_query, query_documents
 
 INPUT_TOPICS = """Law 1 Constitutional Law:
     Topic 1.01 Constitution and Constitutionalism Size:14102,
@@ -359,12 +367,32 @@ def get_step_2_input_without_lr(relevent_topics, facts, legal):
 def get_step_3_input_with_lr(
     legal_memo, selected_laws, facts, legal, title, content, research
 ):
+    legal_memo = legal_memo.replace("<p>", "")
+    legal_memo = legal_memo.replace("</p>", "")
+    legal_memo = legal_memo.replace("<br>!%!", "")
+    legal_memo = legal_memo.replace("<!%!<br>", "")
+    legal_memo = legal_memo.replace("|$|<br>", "")
+    legal_memo = legal_memo.replace("<br>|$|", "")
+    legal_memo = legal_memo.replace("<br>-", " ")
+    legal_memo = legal_memo.replace("<br>", " ")
+    content = content.replace("<p>", "")
+    content = content.replace("</p>", "")
     return f"""You will be drafting the expanded {title} part of the Analysis section of a legal memorandum. This should be a detailed legal analysis discussing the application of the relevant law to the facts of the case, backed by sound legal reasoning. First, carefully read through the full legal memorandum provided: <legal_memorandum> {legal_memo} </legal_memorandum> Next, review the key statement of law that applies to this case: <statement_of_law> {selected_laws} </statement_of_law>review the legal research material that applies to this case: <legal_research> {research} </legal_research>   Now read through the important facts of the case: <facts_of_the_case> {facts} </facts_of_the_case> Keep in mind that your analysis should address this core legal question: <legal_question> {legal} </legal_question> Re-read the current version of the {title} subsection: {title} {content} Before drafting your expanded subsection, take time in a <scratchpad> to thoroughly analyze how the statement of law, and the legal research material applies to the facts of this case. Consider what legal principles are most relevant from the statement of law and the legal research material and which specific facts are most pertinent. Write out your thought process and reasoning here. Now, please draft the expanded {title} subsection of the legal memorandum in detail: - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law and the legal research material. - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case. - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. Provide your complete draft inside <subsection> tags. Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the relevant law, the facts of this case, and your application of that law to those facts to address the stated legal question. Incorporate your scratchpad notes and reasoning into a polished final subsection draft."""
 
 
 def get_step_3_input_without_lr(
     legal_memo, selected_laws, facts, legal, title, content
 ):
+    legal_memo = legal_memo.replace("<p>", "")
+    legal_memo = legal_memo.replace("</p>", "")
+    legal_memo = legal_memo.replace("<br>!%!", "")
+    legal_memo = legal_memo.replace("<!%!<br>", "")
+    legal_memo = legal_memo.replace("|$|<br>", "")
+    legal_memo = legal_memo.replace("<br>|$|", "")
+    legal_memo = legal_memo.replace("<br>-", " ")
+    legal_memo = legal_memo.replace("<br>", " ")
+    content = content.replace("<p>", "")
+    content = content.replace("</p>", "")
     return f"""
         You will be drafting the expanded {title} part of the Analysis section of a legal memorandum. This should be a detailed legal analysis discussing the application of the relevant law to the facts of the case, backed by sound legal reasoning. First, carefully read through the full legal memorandum provided: <legal_memorandum> {legal_memo} </legal_memorandum> Next, review the key statement of law that applies to this case: <statement_of_law> {selected_laws} </statement_of_law> Now read through the important facts of the case: <facts_of_the_case> {facts} </facts_of_the_case> Keep in mind that your analysis should address this core legal question: <legal_question> {legal} </legal_question> Re-read the current version of the {title} subsection: {title} {content} Before drafting your expanded subsection, take time in a <scratchpad> to thoroughly analyze how the statement of law applies to the facts of this case. Consider what legal principles are most relevant from the statement of law and which specific facts are most pertinent. Write out your thought process and reasoning here. Now, please draft the expanded {title} subsection of the legal memorandum in detail: - Provide a well-reasoned legal analysis that discusses the application of the relevant law to the facts of the case. Be sure to incorporate the applicable legal principles (statutes and case laws) from the statement of law. - Divide the analysis into subsections, each addressing a specific legal topic relevant to the case. - For each topic, clearly state the applicable law and relevant facts in an active voice and present your analysis in a logical manner. Provide your complete draft inside <subsection> tags. Remember, the key is providing a thorough and well-reasoned legal analysis that ties together the relevant law, the facts of this case, and your application of that law to those facts to address the stated legal question. Incorporate your scratchpad notes and reasoning into a polished final subsection draft.
 
@@ -435,33 +463,6 @@ def get_step_3_input(legal_memo, selected_laws, facts, legal, title, content):
         relevant law, the facts of this case, and your application of that law to those facts to address the
         stated legal question. Incorporate your scratchpad notes into a polished final subsection draft.
         """
-
-
-def send_legal_memo_basic(legal_memo, *args, **kwargs):
-    html_content = render_to_string(
-        "email/example.html",
-        context={
-            "string": legal_memo.full_legal_memo_html,
-            "id": legal_memo.id,
-            "domain_name": settings.ALLOWED_HOSTS[0],
-        },
-    )
-    subject = "Legal Memorandum Basic"
-    from_email = settings.EMAIL_HOST_USER
-    recipient_list = [
-        # "rithikchaudhary150500@gmail.com",
-        # "jishnusai99@gmail.com",
-        "iammgautam@gmail.com",
-    ]
-    message = EmailMultiAlternatives(
-        subject, body="", from_email=from_email, to=recipient_list
-    )
-    message.attach_alternative(html_content, "text/html")
-    try:
-        message.send()
-        return True
-    except EmailBackend.RecipientRefused:
-        return False
 
 
 def send_legal_memo_detail(legal_memo, *args, **kwargs):
@@ -727,15 +728,9 @@ def step_2_output_formatter(string):
         re.DOTALL,
     ).group(1)
 
-    analysis = re.search(
-        r"!%!Analysis!%!(.*?)!%!Conclusion!%!",
-        full_legal_memo_original,
-        re.DOTALL,
-    ).group(1)
     pattern = r"\|\$\|(.*?)\|\$\|"
     matches = re.findall(pattern, full_legal_memo_original)
     analysis = []
-    print("STRING::::", full_legal_memo_original)
     for title in matches:
         pattern = rf"\|\$\|{title}\|\$\|(.*?)\|\$\|"
         if title == matches[-1]:
@@ -766,3 +761,187 @@ def step_2_output_formatter(string):
         analysis,
         conclusion,
     )
+
+
+def read_word_doc(tag, directory):
+    file_contents = []
+    for filename in os.listdir(directory):
+        if filename.endswith(".docx"):
+            file_contents.append(filename)
+    data = []
+    for file_name in file_contents:
+        # print("FILE NAME::", file_name)
+        file_path = os.path.join(directory, file_name)
+        doc = docx.Document(file_path)
+        regex = r"\[(\d+\.\d+)\]\s*(.+)(?=\.docx)"
+        match = re.search(regex, file_name)
+        book_id = match.group(1)
+        name = match.group(2)
+        file_name_pattern = r"^(.+)(?=\.docx$)"
+        file_name_value = re.search(file_name_pattern, file_name).group(1)
+        # print("NAME::", file_name_value)
+        each_statement = []
+        statement = []
+        citations_list = []
+        v_line_start = None
+        v_line_middle = None
+        v_line_end = None
+        # for statement value
+        for para in doc.paragraphs:
+            if tag in para._p.xml:
+                paragraph_xml = lxml.etree.fromstring(para._p.xml)
+                v_line = paragraph_xml.xpath(
+                    "//v:line", namespaces={"v": "urn:schemas-microsoft-com:vml"}
+                )
+                v_line_attribute = v_line[0].attrib
+                # print("ATTRIB::", v_line_attribute)
+                # if (
+                #     v_line_attribute is not None
+                #     and v_line_attribute.get("strokecolor") == "#009ddb"
+                #     and v_line_attribute.get("strokeweight") == "2pt"
+                # ):
+                #     # print("1st stroke")
+                #     v_line_start = v_line
+                if (
+                    v_line_attribute is not None
+                    and v_line_attribute.get("strokecolor") == "#bcbeb0"
+                    and (
+                        v_line_attribute.get("strokeweight") == ".5pt"
+                        or v_line_attribute.get("strokeweight") == "0.5pt"
+                    )
+                ):
+                    # print("2nd stroke")
+                    v_line_middle = v_line
+                    # break
+                if (
+                    v_line_attribute is not None
+                    and v_line_attribute.get("strokecolor") == "black"
+                    and v_line_attribute.get("strokeweight") == "1pt"
+                ):
+                    # print("VLINE END::", v_line_attribute)
+                    v_line_end = v_line
+
+            para_text = ""
+            if not v_line_middle:
+                for run in para.runs:
+                    if not run.font.superscript:
+                        para_text += run.text
+                each_statement.append(para_text)
+
+            citations_text = ""
+            if v_line_middle and not v_line_end:
+                citations_text += para.text
+            citations_list.append(citations_text)
+        citations_list = [
+            re.search(r"(\t.*)", item).group(1) if "\t" in item else item
+            for item in citations_list
+            if item and item.strip()
+        ]
+        statement.append("".join(each_statement))
+        pattern = rf"\[{book_id}\](.*)\s{name}"
+        match = re.search(pattern, statement[0])
+        if match:
+            start_pos = match.start() + len(book_id) + len(name) + 3
+            filtered_text = statement[0][start_pos:]
+        data.append(
+            {
+                "book_id": book_id,
+                "name": f"[{book_id}] {name}",
+                "statement": filtered_text,
+                "citation_list": citations_list,
+            }
+        )
+    hulsbury_law = [HulsburyLawBooks(**data_item) for data_item in data]
+    data = HulsburyLawBooks.objects.bulk_create(hulsbury_law)
+    return data
+
+
+def update_the_citation():
+    law_obj = HulsburyLawBooks.objects.get(id=530)
+
+    genai.configure(api_key="AIzaSyCvsOGdpu4Ke0E-m90nCSUV2M5LGv5GEwA")
+    # Create the model
+    # See https://ai.google.dev/api/python/google/generativeai/GenerativeModel
+    generation_config = {
+        "temperature": 0.9,
+        "top_p": 1,
+        "top_k": 0,
+        "max_output_tokens": 8192,
+        "response_mime_type": "text/plain",
+    }
+    print("Available base models:", [m.name for m in genai.list_models()])
+
+    model = genai.GenerativeModel(
+        model_name="tunedModels/w2ndfinetuneprompt-ydb1zhmc9pmn",
+        generation_config=generation_config,
+        # safety_settings = Adjust safety settings
+        # See https://ai.google.dev/gemini-api/docs/safety-settings
+    )
+    # for law_single_obj in law_obj.first():
+    # legal_text = ''.join(law_obj.citation_list)
+    # print("Citations::", legal_text, type(legal_text))
+    response = model.generate_content(law_obj.citation_list)
+
+    print(response.text)
+    # response = model.generate_content([
+    # "input: 1 the Assam Rhinoceros Protection Act 1954 s 2. Every rhinoceros captured and the horn or carcass or any\npart of every rhinoceros killed in contravention of the Act will be the property of the state government: Assam\nRhinoceros Protection Act 1954 s 3.\n\n2 The\nWild Life (Protection) Act 1972 has six schedules. Schedules 1, 2, 3, 4 contain a list of endangered\nfauna, mammals, amphibians, reptiles, birds, crustaceans and insects, Sch 5 contains a list of vermin and Sch 6\ncontains a list of endangered flora.\n\n3\nWild Life (Protection) Act 1972 ss 40, 41, 42. Every person who, at the commencement of the Act, was\nin possession of any uncured trophy derived from a Sch 1 or Sch 2 Pt I wild animal, or salted or dried skin of such\nanimal, or the musk of a musk deer, or the horn of a rhinoceros, was required to declare the same to the Chief Wild Life\nWarden within 30 days:\nWild Life (Protection) Act 1972 s 40 (1). The Chief Wild Life Warden would make enquiries, and if\nsatisfied, affix on the article, trophy or uncured trophy, identification marks and issue a certificate of ownership:\nWild Life (Protection) Act 1972 s 41 (1) (b), (c).\n\n4\nWild Life (Protection) Act 1972 s 40 (3).\n\n5\nWild Life (Protection) Act 1972 s 43 (2).\n\nPage 2 of\n\n[15.009] Property in wild animals under the Wild Life (Protection) Act 1972\n\n6\nWild Life (Protection) Act 1972 s 43 (1), (3), (4). Prior to the granting of permission, the Chief Wild Life\nWarden has to ascertain that the animal referred to in the certificate of ownership has been lawfully acquired:\nWild Life (Protection) Act 1972 s 43 (4).",
+    # "output: ",
+    # ])
+
+    # print(response.text)
+
+    # gemini code
+    # output = {
+    #     "statutes": {
+    #         # "Assam Rhinoceros Protection Act 1954 s 2",
+    #         # "Assam Rhinoceros Protection Act 1954 s 3",
+    #         "Wild Life (Protection) Act 1972",
+    #         # "Wild Life (Protection) Act 1972 s 42",
+    #         # "Wild Life (Protection) Act 1972 s 41",
+    #         # "Wild Life (Protection) Act 1972 s 40",
+    #         # "Wild Life (Protection) Act 1972 s 43",
+    #     },
+    #     "case laws": {},
+    #     "files": {},
+    # }
+    # statutes = list(output["statutes"])
+    # case_laws = list(output["case laws"])
+    # files = list(output["files"])
+
+    # return final_function(case_laws, statutes, law_obj.book_id, law_obj)
+
+
+def import_air():
+    results = run_playwright()
+
+    for result in results:
+        case_info = result["case"]
+        paragraph_list = result["case_paragraph"]
+        case_notes_list = result["case_notes"]
+        # create the case obj first.
+        case_obj = Case.objects.create(
+            code=case_info["code"],
+            court=case_info["court"],
+            judges=case_info["judges"],
+            petitioner=case_info["petitioner"],
+            respondent=case_info["respondent"],
+            citations=case_info["citations"],
+        )
+        # create the passage object first.
+        relevant_passage = [
+            Caseparagraph(**para_item, case=case_obj) for para_item in paragraph_list
+        ]
+        para_result = Caseparagraph.objects.bulk_create(relevant_passage)
+        for case_note in case_notes_list:
+            para_number = list(map(int, case_note["paragraph"]))
+            para_objs = [
+                para
+                for para in para_result
+                if para.case == case_obj and para.number in para_number
+            ]
+            del case_note["paragraph"]
+            case_note_obj = CaseNote(**case_note, case=case_obj)
+            case_note_obj.save()
+            case_note_obj.paragraph.add(*para_objs)
+
+    return True

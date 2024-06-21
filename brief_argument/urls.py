@@ -4,6 +4,9 @@ from .views import (
     ArgumentViewSet,
     AIBExammViewsets,
     LegalMemorandumViewsets,
+    HulsburyLawBooksViewsets,
+    StatementEmbeddingsViewsets,
+    RelevantCitationsPassageViewsets,
     main_page,
     step_1,
     step_2,
@@ -14,8 +17,9 @@ from .views import (
     aib_step_2,
     aib_exam_adim_page,
     legal_memo_frontend,
+    legal_search,
 )
-from case_history.views import CaseHistoryViewSet, HighCourtViewsets
+from case_history.views import CaseHistoryViewSet, HighCourtViewsets, LegalSearchHistoryViewsets
 
 router = DefaultRouter()
 router.register(r"arguments", ArgumentViewSet)
@@ -23,6 +27,10 @@ router.register(r"legal_memo", LegalMemorandumViewsets)
 router.register(r"aib_exam", AIBExammViewsets)
 router.register(r"casehistories", CaseHistoryViewSet)
 router.register(r"high_courts", HighCourtViewsets)
+router.register(r"law_books", HulsburyLawBooksViewsets)
+router.register(r"statement", StatementEmbeddingsViewsets)
+router.register(r"relevant_citations", RelevantCitationsPassageViewsets)
+router.register(r"legal_search", LegalSearchHistoryViewsets)
 app_name = "brief_argument"
 
 urlpatterns = [
@@ -36,6 +44,7 @@ urlpatterns = [
     path("step_1/<int:aib_exam_id>/", aib_step_1, name="aib_step_1"),
     path("step_2/<int:aib_exam_id>/", aib_step_2, name="aib_step_2"),
     path("aib_admin/", aib_exam_adim_page, name="aib_exam_admin_page"),
+    path("search/", legal_search, name="legal_search"),
     path(
         "legal_memorandum/<uuid:legal_memo_id>/",
         legal_memo_frontend,

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Include the Quill library -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <title>Step 2</title>
+</head>
+
+<body>
+    <div id="app">
+        <h1>Legal Search</h1>
+        <label for="aib_input">Search:</label>
+        <input id="legal_search" type="text" name="legal_search">
+        <input type="submit" value="Submit" @click="search_api">
+        <br><br><br>
+        <h3>Relevant Results of Case Laws and Statues:</h3>
+        <ul>
+            <li v-for="(item, index) in results" :key="index">
+                <h3>[[ item.score_value ]]</h3>
+                <h3>[[ item.doc_name ]]</h3>
+                <br>
+                <p>[[ item.passage ]]</p>
+            </li>
+        </ul>
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    const { createApp, ref, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+
+    // createApp({
+    //     setup() {
+    //         const url = window.location.href;
+    //         const uuid = window.location.href.split('/');
+    //         const legal_search = ref('WORKING');
+    //         const results = ref([]);
+
+    //         const search_api = () => {
+    //             const textarea = document.getElementById('legal_search');
+    //             console.log("Constance");
+    //             axios.post('/api/statement/search/', {
+    //                 search_text: textarea.value,
+    //             }, {
+    //                 headers: {
+    //                     'X-CSRFToken': csrftoken
+    //                 }
+    //             }).then(response => {
+    //                 console.log("HAPPING", response.data.result);
+    //                 results.value = response.data.result
+    //             }).catch(error => {
+    //                 console.error(error);
+    //             });
+    //         };
+
+    //         return {
+    //             ...toRefs({
+    //                 search_api,
+    //             }),
+    //             legal_search,
+    //             results,
+    //         };
+    //     },
+    // })
+    // app.config.compilerOptions.delimiters = ["[[", "]]"];
+    // app.mount('#app')
+
+    const app = createApp({
+        setup() {
+            const url = window.location.href;
+            const uuid = window.location.href.split('/');
+            const legal_search = ref('WORKING');
+            const results = ref([]);
+
+            const search_api = () => {
+                const textarea = document.getElementById('legal_search');
+                console.log("Constance");
+                axios.post('/api/statement/search/', {
+                    search_text: textarea.value,
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    console.log("HAPPING", response.data.result);
+                    results.value = response.data.result
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+
+            // onMounted(() => {
+            //     window.scrollTo(0, 0);
+            // });
+
+            return {
+                ...toRefs({
+                    search_api,
+                }),
+                legal_search,
+                results,
+            }
+        }
+    })
+    app.config.compilerOptions.delimiters = ["[[", "]]"];
+    app.mount('#app')
+</script>
+
+
+</html>

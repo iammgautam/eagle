@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Argument, Legal_Memorandum, AIB_EXAM
+from .models import (
+    Argument,
+    Legal_Memorandum,
+    AIB_EXAM,
+    HulsburyLawBooks,
+    RelevantCitationsPassage,
+    StatementEmbeddings,
+    Case,CaseNote, Caseparagraph
+)
 
 
 # Register your models here.
@@ -35,3 +43,64 @@ class Legal_MemorandumAdmin(admin.ModelAdmin):
     )
     search_fields = ("legal_principal",)
     ordering = ("-created_date",)
+
+
+@admin.register(HulsburyLawBooks)
+class HulsburyLawBooksAdmin(admin.ModelAdmin):
+    list_display = ("id", "book_id", "name")
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("book_id", "name")
+    ordering = ("book_id",)
+
+
+@admin.register(RelevantCitationsPassage)
+class RelevantCitationsPassageAdmin(admin.ModelAdmin):
+    list_display = ("id", "husbury_file", "doc_name")
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("doc_name",)
+
+
+@admin.register(StatementEmbeddings)
+class StatementEmbeddingsAdmin(admin.ModelAdmin):
+    list_display = ("id", "husbury_file",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("husbury_file",)
+
+
+@admin.register(Case)
+class CaseAdmin(admin.ModelAdmin):
+    list_display = ("id", "code",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("code",)
+
+
+@admin.register(CaseNote)
+class CaseNoteAdmin(admin.ModelAdmin):
+    list_display = ("id", "case",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("case","short_text")
+
+
+@admin.register(Caseparagraph)
+class CaseparagraphAdmin(admin.ModelAdmin):
+    list_display = ("id", "case",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("case","text")

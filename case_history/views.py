@@ -2,8 +2,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import viewsets
-from .models import CaseHistory, HighCourts
-from .serializers import CaseHistorySerializer, HighCourtsSerializer
+from .models import CaseHistory, HighCourts, LegalSearchHistory
+from .serializers import CaseHistorySerializer, HighCourtsSerializer, LegalSearchHistorySerializer
 
 
 class CaseHistoryViewSet(viewsets.ModelViewSet):
@@ -46,3 +46,7 @@ class CaseHistoryViewSet(viewsets.ModelViewSet):
 class HighCourtViewsets(viewsets.ModelViewSet):
     queryset = HighCourts.objects.all()
     serializer_class = HighCourtsSerializer
+
+class LegalSearchHistoryViewsets(viewsets.ModelViewSet):
+    queryset = LegalSearchHistory.objects.all()
+    serializer_class = LegalSearchHistorySerializer

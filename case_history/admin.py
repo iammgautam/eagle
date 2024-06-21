@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext as _
-from .models import CaseHistory, LawTopics, HighCourts
+from .models import CaseHistory, LawTopics, HighCourts, LegalSearchHistory
 
 
 # Register your models here.
@@ -83,4 +83,11 @@ class HghiCourtsAdmin(admin.ModelAdmin):
     list_display = ("id", "name")
     list_filter = ("created_date", "modified_date")
     search_fields = ("name",)
+    ordering = ("-created_date",)
+
+@admin.register(LegalSearchHistory)
+class LegalSearchHistoryAdmin(admin.ModelAdmin):
+    list_display = ("id", "search_text")
+    list_filter = ("created_date", "modified_date")
+    search_fields = ("search_text",)
     ordering = ("-created_date",)

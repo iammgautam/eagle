@@ -14,8 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = os.getenv("DEBUG")
 
-# ALLOWED_HOSTS = ['localhost']
-ALLOWED_HOSTS = ['35.154.64.164']
+ALLOWED_HOSTS = ['localhost']
+# ALLOWED_HOSTS = ['35.154.64.164']
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
@@ -72,26 +72,26 @@ WSGI_APPLICATION = "legal_gpt.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-DATABASES = {
-    'default': {
-        'ENGINE':os.getenv('DATABASE_ENGINE'),
-        'NAME': os.getenv('DATABASE_NAME'),
-        'USER': os.getenv('DATABASE_USER'),
-        'PASSWORD': os.getenv('DATABASE_PASS'),
-        'HOST': os.getenv('DATABASE_HOST'),
-        'PORT': os.getenv('DATABASE_PORT'),
-    }
-}
 # DATABASES = {
-#      'default': {
-#          'ENGINE':"django.db.backends.postgresql",
-#          'NAME': "syndicus",
-#          'USER': "mithilesh",
-#          'PASSWORD': "kela",
-#          'HOST':"localhost",
-#          'PORT': "5432",
-#      }
+#     'default': {
+#         'ENGINE':os.getenv('DATABASE_ENGINE'),
+#         'NAME': os.getenv('DATABASE_NAME'),
+#         'USER': os.getenv('DATABASE_USER'),
+#         'PASSWORD': os.getenv('DATABASE_PASS'),
+#         'HOST': os.getenv('DATABASE_HOST'),
+#         'PORT': os.getenv('DATABASE_PORT'),
+#     }
 # }
+DATABASES = {
+     'default': {
+         'ENGINE':"django.db.backends.postgresql",
+         'NAME': "syndicus",
+         'USER': "mithilesh",
+         'PASSWORD': "kela",
+         'HOST':"localhost",
+         'PORT': "5432",
+     }
+}
 
 
 # Password validation

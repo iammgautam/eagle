@@ -1,22 +1,39 @@
 import re
 import json
+import openai
+from django.db.models import Func, Value, FloatField
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import get_token
 from django.utils.safestring import mark_safe
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework import status
 from django.urls import reverse
 from django.shortcuts import render
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
 from rest_framework import viewsets
-from .models import Argument, Legal_Memorandum, AIB_EXAM
+from pgvector.django import CosineDistance
+
+from brief_argument.scraper2 import run_playwright
+from .models import (
+    Argument,
+    Legal_Memorandum,
+    AIB_EXAM,
+    HulsburyLawBooks,
+    StatementEmbeddings,
+    RelevantCitationsPassage,
+    Case, CaseNote, Caseparagraph
+)
+from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
 from .serializers import (
     ArgumentSerializer,
     LegalMemorandumSerializer,
     AIBExamSerializer,
+    HulsburyLawBooksSerializer,
+    StatementEmbeddingsSerializer,
+    RelevantCitationsPassageSerializer,
 )
-from case_history.models import LawTopics
 from .utils import (
     INPUT_TOPICS,
     get_step_1_input,
@@ -24,14 +41,16 @@ from .utils import (
     get_step_2_input_without_lr,
     get_step_3_input_with_lr,
     get_step_3_input_without_lr,
-    send_legal_memo_basic,
+    import_air,
+    read_word_doc,
     send_legal_memo_detail,
     aib_exam__step_1_input,
     aib_exam_step_2_input,
     relevent_topics_input_generator,
     send_aib_mail,
     step_2_output_formatter,
-    law_topics_format_generator
+    law_topics_format_generator,
+    update_the_citation,
 )
 
 
@@ -47,6 +66,7 @@ class ArgumentViewSet(viewsets.ModelViewSet):
                 analysis["detailed_content"],
                 re.DOTALL,
             ).group(1)
+            formatted_analysis = formatted_analysis.replace("|$|", "")
             bulk_update.append(
                 Argument(id=analysis["id"], detailed_content=formatted_analysis)
             )
@@ -58,8 +78,6 @@ class ArgumentViewSet(viewsets.ModelViewSet):
         )
         legal_memo = Legal_Memorandum.objects.get(id=request.data.get("legal_memo"))
 
-        # send mail (normal legal_memo)
-        send_legal_memo_basic(legal_memo)
         # send mail (detailed legal_memo)
         send_legal_memo_detail(legal_memo)
 
@@ -206,8 +224,66 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
         )
 
 
+
+class HulsburyLawBooksViewsets(viewsets.ModelViewSet):
+    queryset = HulsburyLawBooks.objects.all()
+    serializer_class = HulsburyLawBooksSerializer
+
+
+class StatementEmbeddingsViewsets(viewsets.ModelViewSet):
+    queryset = StatementEmbeddings.objects.all()
+    serializer_class = StatementEmbeddingsSerializer
+
+    @action(detail=False, methods=["POST"])
+    def search(self, request, pk=None):
+        search_text = request.data.get("search_text")
+        print("search text::", search_text)
+
+        embedding = openai.embeddings.create(
+            input=[search_text], model="text-embedding-3-large"
+        )
+        search_history = LegalSearchHistory.objects.filter(
+            search_text=request.data.get("search_text"),
+            embeddings=embedding.data[0].embedding,
+        )
+        if not search_history.exists():
+            search_history = LegalSearchHistory.objects.create(
+                search_text=request.data.get("search_text"),
+                embeddings=embedding.data[0].embedding,
+            )
+
+        statement_result = StatementEmbeddings.objects.order_by(
+            CosineDistance("embeddings", embedding.data[0].embedding)
+        ).values_list("husbury_file")
+
+        # final_result = (
+        #     RelevantCitationsPassage.objects.filter(
+        #         husbury_file__id__in=statement_result
+        #     )
+        #     .order_by(CosineDistance("embeddings", embedding.data[0].embedding))
+        #     .values("doc_name", "passage")
+        # )[:10]
+        final_result = (
+            RelevantCitationsPassage.objects.filter(
+                husbury_file__id__in=statement_result
+            )
+            .annotate(score_value=CosineDistance("embeddings", embedding.data[0].embedding))
+            .order_by("score_value")
+            .values("score_value", "doc_name", "passage")
+        )
+
+        return Response({"result": final_result}, status=status.HTTP_201_CREATED)
+
+
+class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
+    queryset = RelevantCitationsPassage.objects.all()
+    serializer_class = RelevantCitationsPassageSerializer
+
+
 def main_page(request):
     # print(law_topics_format_generator())
+    # import_air()
+    # run_playwright()
     csrf_token = get_token(request)
     return render(request, "brief_argument/main_page.html", {"csrf_token": csrf_token})
 
@@ -273,6 +349,7 @@ def step_3(request, legal_memo_id):
                         legal,
                         anal.title,
                         anal.content,
+                        legal_memo.case_history.legal_research,
                     ),
                 }
             )
@@ -302,6 +379,12 @@ def step_3(request, legal_memo_id):
 
 
 def admin_home_page(request):
+    working = update_the_citation()
+    # filtered_content = read_word_doc(
+    #     "v:line",
+    #     "/Users/mithilesh/law/Animals/fwdanimals",
+    # )
+    # print("WHAT IS THIS::", working)
     case_history = CaseHistory.objects.filter(is_completed=False).order_by(
         "created_date"
     )
@@ -310,6 +393,7 @@ def admin_home_page(request):
     context = {
         "case_history": case_history_obj,
         "count": count,
+        "Values": "HAHHAAH",
     }
     return render(request, "brief_argument/admin_home_page.html", context)
 
@@ -382,7 +466,7 @@ def legal_memo_frontend(request, legal_memo_id):
         analysis.append(
             {
                 "title": anal.title,
-                "content": anal.detailed_content,
+                "content": anal.content,
             }
         )
     conclusion = legal_memo.conclusion
@@ -397,3 +481,11 @@ def legal_memo_frontend(request, legal_memo_id):
         "conclusion": mark_safe(conclusion),
     }
     return render(request, "brief_argument/legal_memo_fe.html", context)
+
+
+def legal_search(request):
+    csrf_token = get_token(request)
+    context = {
+        "csrf_token": csrf_token,
+    }
+    return render(request, "brief_argument/legal_search.html", context)

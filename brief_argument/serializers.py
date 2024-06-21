@@ -1,5 +1,12 @@
 from rest_framework import serializers
-from .models import Argument, Legal_Memorandum, AIB_EXAM
+from .models import (
+    Argument,
+    Legal_Memorandum,
+    AIB_EXAM,
+    HulsburyLawBooks,
+    RelevantCitationsPassage,
+    StatementEmbeddings,
+)
 
 
 class ArgumentSerializer(serializers.ModelSerializer):
@@ -43,6 +50,46 @@ class LegalMemorandumSerializer(serializers.ModelSerializer):
             "relevant_topics",
             "full_legal_memo_original",
             "full_legal_memo_html",
+            "created_date",
+            "modified_date",
+        ]
+
+
+class HulsburyLawBooksSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HulsburyLawBooks
+        fields = [
+            "book_id",
+            "name",
+            "statement",
+            "citation_list",
+            "citation_value",
+            "unique_id",
+            "created_date",
+            "modified_date",
+        ]
+
+
+class RelevantCitationsPassageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RelevantCitationsPassage
+        fields = [
+            "doc_name",
+            "passage",
+            "embeddings",
+            "score",
+            "husbury_file",
+            "created_date",
+            "modified_date",
+        ]
+
+
+class StatementEmbeddingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StatementEmbeddings
+        fields = [
+            "husbury_file",
+            "embeddings",
             "created_date",
             "modified_date",
         ]
