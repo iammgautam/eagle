@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include the Quill library -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <title>Step 2</title>
+</head>
+<style>
+    .gradient-box {
+        height: 98vh;
+        background: linear-gradient(#F1F0E8 80%, #ffffff 100%);
+    }
+
+
+    .subtitle {
+        background: linear-gradient(to right,
+                #848484 20%,
+                #848484 40%,
+                #ffffff 65%,
+                #848484 100%);
+        color: black;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        padding: 10px;
+    }
+
+    .search-input {
+        margin-top: 20px;
+    }
+
+
+    .sentence {
+        opacity: 0;
+        animation: typing 2s steps(30, end) forwards;
+    }
+
+    @keyframes typing {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+
+    .search-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.5s ease-in-out;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .search-container.transition-active {
+        top: 90px;
+        transform: translateY(0);
+    }
+
+    .search-input {
+        transition: all 0.5s ease-in-out;
+    }
+
+    .search-button {
+        transition: all 0.5s ease-in-out;
+        height: auto;
+        height: 60px;
+        width: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .transition-active .search-button {
+        height: 42px;
+        width: 42px;
+        padding: 0;
+    }
+
+    .results-container {
+        opacity: 0;
+        transform: translateY(100%);
+        transition: all 0.5s ease-in-out;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 180px;
+        padding: 0 1rem;
+    }
+
+    .results-container.show-results {
+        opacity: 1;
+        transform: translateY(0);
+    }
+</style>
+
+<body>
+    <div id="app">
+        <div class="gradient-box from-[#F1F0E8] to-[#ffffff] p-4 relative overflow-hidden">
+            <div class="relative flex flex-col items-center text-center font-epilogue"
+                :class="{ 'mt-10': !isTransitioning, 'mt-6': isTransitioning }">
+                <p class="text-[#28261B] mb-4 text-4xl lg:text-4xl">LexPlore</p>
+                <p v-if="!isTransitioning" class="text-[#28261B] w-full text-base lg:text-xl -mt-3">
+                    India's most advanced legal research search box
+                </p>
+            </div>
+
+            <div
+                :class="['search-container flex-grow flex items-center justify-center', { 'transition-active': isTransitioning }]">
+                <div class="relative w-full max-w-[950px]" :class="{ 'max-w-[950px]': isTransitioning }">
+                    <div class="flex flex-col items-center justify-center">
+                        <div class="flex items-center justify-center w-full">
+                            <textarea ref="searchInput" v-model="searchQuery" placeholder="Search..." :class="[
+                      'search-input font-inter shadow-lg text-lg rounded-2xl pl-4 pr-4 py-2',
+                      {
+                        'w-[950px] border-2 border-gray-600': !isTransitioning,
+                        'w-[700px] border border-gray-400': isTransitioning
+                      }
+                    ]" @input="adjustHeight" rows="1" :style="{
+                      height: 'auto',
+                      minHeight: isTransitioning ? '42px' : '100px',
+                      maxHeight: isTransitioning ? '9vh' : '16vh',
+                      overflowY: 'auto',
+                    }"></textarea>
+                            <button :class="[
+                      'search-button font-inter shadow-lg mt-4 px-4 py-2 rounded-2xl cursor-pointer transition-all duration-300 ml-3',
+                      {
+                        'bg-[#BA5B37] bg-opacity-85 text-[#FFFFFF]': !searchQuery && !buttonHover,
+                        'bg-[#BA5B37] text-[#FFFFFF]': searchQuery || buttonHover,
+                        'bg-[#BA5B38] bg-opacity-85 text-[#FFFFFF]': buttonHover,
+                      }
+                    ]" @mouseover="buttonHover = true" @mouseleave="buttonHover = false"
+                                @click="startTransition();search_api()">
+                                <span v-if="!isTransitioning"
+                                    class="w-20 inline-block text-medium text-lg">Search</span>
+                                <svg v-else class="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                        d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div v-if="isTransitioning && is_result"
+                            class="w-full text-center text-sm text-gray-600 mt-1 pr-2">
+                            [[ citations.length ]] results found
+                        </div>
+                        <div v-if="!isTransitioning" class="mt-4 text-center text-[#1F2837] font-epilogue h-6">
+                            <div class="text-sm">
+                                <span class="sentence">{{ typedSentence }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div v-if="is_result" :class="['results-container', { 'show-results': isTransitioning }]">
+                <div
+                    class="results flex border rounded-lg shadow-lg bg-[#F8F8F8] border-[#a8a8a8] p-4 mt-8 h-[540px] flex-col">
+                    <div class="flex flex-1">
+                        <div class="w-2/5 p-4 flex flex-col border-r border-gray-300">
+                            <h2 class="text-lg font-medium mb-3 -mt-4 text-left font-epilogue">Authority</h2>
+                            <div class="overflow-y-auto leading-relaxed text-[#050142] font-inter"
+                                style="max-height: 460px; font-size: 14px;">
+                                <ul>
+                                    <li v-for="(citation, index) in sortedCitations" :key="index" :class="[
+                          'my-3 cursor-pointer hover:underline',
+                          {
+                            'font-bold text-[#050142]': index === selectedCitation,
+                          },
+                        ]" @click="selectCitation(index)">
+                                        <div>
+                                            <span class="text-blue-600">[[ citation.petitioner_name ]]</span>
+                                            <span class="text-gray-700"> v. </span>
+                                            <span class="text-red-600">[[ citation.respondent_name ]]</span>
+                                        </div>
+                                        <div class="text-sm text-gray-600">in The [[ citation.court ]], 2023</div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="w-3/5 p-4 flex flex-col">
+                            <h2 class="text-lg font-medium mb-4 -mt-4 text-left font-epilogue font-inter">Case Text</h2>
+                            <div class="overflow-y-auto" style="max-height: 460px">
+                                <div v-if="selectedCitation !== null">
+                                    <div v-for="(paragraph, index) in sortedParagraphs" :key="index" :class="[
+                          'bg-[#F3F4ED] text-[#28261B] shadow-sm border border-gray-200 hover:border hover:border-none rounded-lg p-4 mb-4 leading-relaxed relative text-justify',
+                          { 'font-bold': paragraph.isHighest }
+                        ]" style="font-size: 14px; height: auto;">
+                                        <div class="overflow-y-auto h-full pr-8">
+                                            <!-- @click="openReaderView(paragraph.text)"> -->
+                                            [[ paragraph.text ]]
+                                        </div>
+                                        <div class="absolute bottom-2 right-2" @mouseenter="hoveredIndex = index"
+                                            @mouseleave="hoveredIndex = null">
+                                            <div :class="[
+                              'p-2 rounded-lg transition-all duration-200 ease-in-out',
+                              { 'bg-[#dad4c0]': hoveredIndex === index }
+                            ]">
+                                                <ClipboardIcon v-if="!copiedStates[index]"
+                                                    class="w-5 h-5 cursor-pointer"
+                                                    @click.stop="copyToClipboard(paragraph.text, index)" />
+                                                <CheckIcon v-else class="w-5 h-5 text-green-600" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h2
+                class="text-[#28261B] text-center font-semibold font-inter absolute bottom-0 left-1/2 transform -translate-x-1/2 text-sm">
+                SYNDICUS
+            </h2>
+        </div>
+
+        <div v-if="showReaderView" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+            @click.self="closeReaderView">
+            <div class="bg-white w-[180mm] h-[200mm] p-8 overflow-y-auto">
+                <p class="text-gray-700 text-lg text-justify font-inter leading-relaxed">
+                    {{ selectedContent }}
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@dingdaoos/lucid-ui@1.0.7/lib/lucid-ui.umd.min.js"></script>
+
+<script>
+    const { createApp, ref, toRefs, onMounted, nextTick, computed, defineComponent } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+
+    const app = createApp({
+        setup() {
+            const url = window.location.href;
+            const uuid = window.location.href.split('/');
+            const legal_search = ref('WORKING');
+            const citations = ref([]);
+            const selectedCitation = ref(0);
+            const searchQuery = ref("");
+            const buttonHover = ref(false);
+            const hoveredIndex = ref(null);
+            const copiedStates = ref([]);
+            const searchInput = ref(null);
+            const currentScreen = ref(1);
+            const is_result = ref(false);
+
+            const search_api = () => {
+                console.log("Constance");
+                axios.post('/api/lexipro/search1/step_1_search/', {
+                    search_text: searchQuery.value,
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    console.log("HAPPING", response.data.result);
+                    citations.value = response.data.result;
+                    is_result.value = true;
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+
+            onMounted(() => {
+                adjustHeight();
+                animateSentences();
+            });
+
+            const sortedCitations = computed(() => {
+                return [...citations.value].sort((a, b) => b.ratio_score - a.ratio_score);
+            });
+
+            const sortedParagraphs = computed(() => {
+                if (selectedCitation.value === null) return [];
+
+                const paragraphs = sortedCitations.value[selectedCitation.value].paragraph_value;
+                const highestScore = Math.max(...paragraphs.map(p => p.para_score));
+
+                return paragraphs.map(p => ({
+                    ...p,
+                    isHighest: p.para_score === highestScore
+                }));
+            });
+
+            const selectCitation = (index) => {
+                selectedCitation.value = index;
+            };
+
+            const copyToClipboard = (text, index) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    copiedStates.value[index] = true;
+                    setTimeout(() => {
+                        copiedStates.value[index] = false;
+                    }, 2000);
+                });
+            };
+
+            const adjustHeight = () => {
+                if (searchInput.value) {
+                    searchInput.value.style.height = 'auto';
+                    searchInput.value.style.height = `${searchInput.value.scrollHeight}px`;
+                }
+            };
+
+            const switchToScreen2 = async () => {
+                currentScreen.value = 2;
+                await nextTick();
+            };
+
+            const typedSentence = ref("");
+            const sentences = ref([
+                "The smartest way to legal research",
+                "Just enter the legal issue or a brief answer to any legal issue",
+                "Optionally, you can include brief facts of the case",
+            ]);
+            const currentSentenceIndex = ref(0);
+
+            const typeSentence = (sentence, delay) => {
+                let i = 0;
+                return new Promise((resolve) => {
+                    const intervalId = setInterval(() => {
+                        typedSentence.value += sentence.charAt(i);
+                        i++;
+                        if (i === sentence.length) {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                resolve();
+                            }, delay);
+                        }
+                    }, 40);
+                });
+            };
+
+            const animateSentences = async () => {
+                const sentence = sentences.value[currentSentenceIndex.value];
+                await typeSentence(sentence, 2000);
+                typedSentence.value = "";
+                currentSentenceIndex.value =
+                    (currentSentenceIndex.value + 1) % sentences.value.length;
+                setTimeout(animateSentences, 500); // Adjust the delay as needed
+            };
+
+            const showReaderView = ref(false);
+            const selectedContent = ref("");
+
+            // const openReaderView = (content) => {
+            //     selectedContent.value = content;
+            //     showReaderView.value = true;
+            // };
+
+            const closeReaderView = () => {
+                showReaderView.value = false;
+            };
+            const isTransitioning = ref(false);
+
+            const startTransition = () => {
+                isTransitioning.value = true;
+            };
+
+            return {
+                citations,
+                selectedCitation,
+                sortedCitations,
+                sortedParagraphs,
+                selectCitation,
+                copyToClipboard,
+                hoveredIndex,
+                copiedStates,
+                adjustHeight,
+                searchQuery,
+                buttonHover,
+                currentScreen,
+                switchToScreen2,
+                sentences,
+                currentSentenceIndex,
+                typedSentence,
+                showReaderView,
+                selectedContent,
+                // openReaderView,
+                closeReaderView,
+                startTransition,
+                isTransitioning,
+                ...toRefs({
+                    search_api,
+                }),
+                legal_search,
+                is_result,
+            }
+        }
+    })
+    app.config.compilerOptions.delimiters = ["[[", "]]"];
+    app.mount('#app')
+</script>
+
+</html>

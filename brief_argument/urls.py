@@ -1,12 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    ArgumentViewSet,
-    AIBExammViewsets,
-    LegalMemorandumViewsets,
-    HulsburyLawBooksViewsets,
-    StatementEmbeddingsViewsets,
-    RelevantCitationsPassageViewsets,
     main_page,
     step_1,
     step_2,
@@ -18,6 +12,15 @@ from .views import (
     aib_exam_adim_page,
     legal_memo_frontend,
     legal_search,
+)
+from .viewsets import (
+    ArgumentViewSet,
+    AIBExammViewsets,
+    LegalMemorandumViewsets,
+    HulsburyLawBooksViewsets,
+    StatementEmbeddingsViewsets,
+    RelevantCitationsPassageViewsets,
+    CaseViewsets
 )
 from case_history.views import CaseHistoryViewSet, HighCourtViewsets, LegalSearchHistoryViewsets
 
@@ -31,6 +34,7 @@ router.register(r"law_books", HulsburyLawBooksViewsets)
 router.register(r"statement", StatementEmbeddingsViewsets)
 router.register(r"relevant_citations", RelevantCitationsPassageViewsets)
 router.register(r"legal_search", LegalSearchHistoryViewsets)
+router.register(r"lexipro/search1", CaseViewsets)
 app_name = "brief_argument"
 
 urlpatterns = [

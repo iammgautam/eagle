@@ -1,6 +1,8 @@
 import re
 import docx
 import os
+import openai
+from openai import OpenAI
 import google.generativeai as genai
 import lxml.etree
 import numpy as np
@@ -912,36 +914,77 @@ def update_the_citation():
 
 
 def import_air():
-    results = run_playwright()
 
-    for result in results:
-        case_info = result["case"]
-        paragraph_list = result["case_paragraph"]
-        case_notes_list = result["case_notes"]
-        # create the case obj first.
-        case_obj = Case.objects.create(
-            code=case_info["code"],
-            court=case_info["court"],
-            judges=case_info["judges"],
-            petitioner=case_info["petitioner"],
-            respondent=case_info["respondent"],
-            citations=case_info["citations"],
+    # Set your OpenAI API key
+    openai.api_key = os.getenv("OPEN_AI")
+
+    # paras = Caseparagraph.objects.all()
+    # for para in paras:
+    #     embedding = openai.embeddings.create(input=[para.text], model="text-embedding-3-large")
+    #     para.embeddings = embedding.data[0].embedding
+    #     para.save()
+    index = 1
+    notes = CaseNote.objects.all()
+    for note in notes:
+        embedding = openai.embeddings.create(
+            input=[note.short_text], model="text-embedding-3-large"
         )
-        # create the passage object first.
-        relevant_passage = [
-            Caseparagraph(**para_item, case=case_obj) for para_item in paragraph_list
-        ]
-        para_result = Caseparagraph.objects.bulk_create(relevant_passage)
-        for case_note in case_notes_list:
-            para_number = list(map(int, case_note["paragraph"]))
-            para_objs = [
-                para
-                for para in para_result
-                if para.case == case_obj and para.number in para_number
-            ]
-            del case_note["paragraph"]
-            case_note_obj = CaseNote(**case_note, case=case_obj)
-            case_note_obj.save()
-            case_note_obj.paragraph.add(*para_objs)
+        note.embeddings = embedding.data[0].embedding
+        note.save()
+        print("Index::", index + 1)
+        index = index + 1
 
     return True
+
+
+def open_ai_keyword_api(input_text):
+    client = OpenAI(
+        api_key=os.getenv("OPEN_AI"),
+    )
+    # openai.api_key = os.getenv("OPEN_AI")
+    model = "gpt-4o"
+    prompt = f"""
+        You are a legal researcher tasked with suggesting individual searchable key phrases to perform legal research for a particular legal issue. Your goal is to analyze the given legal text and extract relevant key phrases that must be useful for further legal research.
+        Here is the legal text you need to analyze:
+        <legal_text>
+        {input_text}
+        </legal_text>
+        Follow these steps to generate a list of searchable key phrases:
+
+        Read the entire text carefully to understand the general topic and context.
+        Determine the primary subject matter.
+        Identify and highlight terms and phrases that stand out as particularly relevant or important.
+        Look for specific legal terminology relevant to the topic.
+        Note words and phrases that are repeated throughout the text.
+        Consider the jurisdiction, as legal terms and relevance can vary by location.
+
+        When selecting keywords, keep the following guidelines in mind:
+
+        Ensure the key phrases are directly relevant to the specific legal issue or question.
+        Begin with broad terms and then narrow down to more specific terms as needed.
+        Include a mix of general legal concepts and case-specific terms.
+        Consider including names of relevant laws, statutes, or regulations.
+        Do not include names of parties or entities involved.
+
+        Your output must be a list of individual searchable keywords in JSON format. The JSON should contain an array of strings, where each string is a key phrase.
+        Aim to provide between 2 and 10 key phrases, depending on the complexity and length of the given text. Make sure each key phrase is relevant and useful for further legal research on the topic."""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=150,
+        temperature=0,
+        top_p=1.0,
+        n=1,
+        stop=None,
+    )
+    result = response.choices[0].message.content.replace("\n", "")
+    result = result.replace("```", "")
+    result = result.replace("json", "")
+    print(result, type(result))
+    # result = result.split()
+    # print(result, type(result))
+    return result

@@ -6,6 +6,9 @@ from .models import (
     HulsburyLawBooks,
     RelevantCitationsPassage,
     StatementEmbeddings,
+    Case,
+    CaseNote,
+    Caseparagraph,
 )
 
 
@@ -92,4 +95,114 @@ class StatementEmbeddingsSerializer(serializers.ModelSerializer):
             "embeddings",
             "created_date",
             "modified_date",
+        ]
+
+
+class CaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Case
+        fields = [
+            "id",
+            "code",
+            "court",
+            "judges",
+            "petitioner",
+            "respondent",
+            "citations",
+        ]
+
+
+class CaseparagraphSerializer(serializers.ModelSerializer):
+    para_score = serializers.SerializerMethodField()
+
+    def get_para_search(self, instance):
+        if instance.para_score:
+            return instance.para_score
+        return None
+
+    class Meta:
+        model = Caseparagraph
+        fields = [
+            "id",
+            "para_count",
+            "number",
+            "text",
+            "case",
+            "para_score",
+        ]
+
+
+class CaseNoteSerializer(serializers.ModelSerializer):
+    paragraph = CaseparagraphSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = CaseNote
+        fields = [
+            "id",
+            "short_text",
+            "long_text",
+            "para_number",
+            "paragraph",
+            "case",
+            "created_date",
+            "modified_date",
+        ]
+
+
+class LegalReaserchParagraphStep1Serializer(serializers.ModelSerializer):
+    para_score = serializers.SerializerMethodField()
+
+    def get_para_search(self, instance):
+        if instance.para_score:
+            instance.para_score = instance.para_score.replace('"', "'")
+            return instance.para_score.strip()
+        return None
+
+    class Meta:
+        model = Caseparagraph
+        fields = [
+            "id",
+            "text",
+            "para_score",
+        ]
+
+
+class LegalResearchStep1Serializer(serializers.ModelSerializer):
+    ratio_score = serializers.SerializerMethodField()
+    case_note_score = serializers.SerializerMethodField()
+    case = serializers.SerializerMethodField()
+    petitioner_name = serializers.SerializerMethodField()
+    respondent_name = serializers.SerializerMethodField()
+    court = serializers.SerializerMethodField()
+    paragraph_value = LegalReaserchParagraphStep1Serializer(read_only=True, many=True)
+
+    def get_ratio_score(self, instance):
+        return instance.ratio_score
+
+    def get_case_note_score(self, instance):
+        return instance.case_note_score
+
+    def get_case(self, instance):
+        return instance.case.code
+
+    def get_respondent_name(self, instance):
+        return instance.case.respondent_name
+
+    def get_petitioner_name(self, instance):
+        return instance.case.petitioner_name
+
+    def get_court(self, instance):
+        return instance.case.court
+
+    class Meta:
+        model = CaseNote
+        fields = [
+            "id",
+            "case",
+            "respondent_name",
+            "petitioner_name",
+            "court",
+            "ratio_score",
+            "case_note_score",
+            "paragraph_value",
         ]

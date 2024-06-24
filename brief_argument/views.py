@@ -1,7 +1,12 @@
 import re
 import json
 import openai
-from django.db.models import Func, Value, FloatField
+import numpy as np
+from django.db import transaction
+from django.db.models import Func, Value, FloatField, Count, Max, TextField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import Q
+from django.db.models.functions import Cast
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import get_token
 from django.utils.safestring import mark_safe
@@ -22,7 +27,9 @@ from .models import (
     HulsburyLawBooks,
     StatementEmbeddings,
     RelevantCitationsPassage,
-    Case, CaseNote, Caseparagraph
+    Case,
+    CaseNote,
+    Caseparagraph,
 )
 from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
@@ -42,6 +49,7 @@ from .utils import (
     get_step_3_input_with_lr,
     get_step_3_input_without_lr,
     import_air,
+    open_ai_keyword_api,
     read_word_doc,
     send_legal_memo_detail,
     aib_exam__step_1_input,
@@ -224,7 +232,6 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
         )
 
 
-
 class HulsburyLawBooksViewsets(viewsets.ModelViewSet):
     queryset = HulsburyLawBooks.objects.all()
     serializer_class = HulsburyLawBooksSerializer
@@ -267,7 +274,9 @@ class StatementEmbeddingsViewsets(viewsets.ModelViewSet):
             RelevantCitationsPassage.objects.filter(
                 husbury_file__id__in=statement_result
             )
-            .annotate(score_value=CosineDistance("embeddings", embedding.data[0].embedding))
+            .annotate(
+                score_value=CosineDistance("embeddings", embedding.data[0].embedding)
+            )
             .order_by("score_value")
             .values("score_value", "doc_name", "passage")
         )
@@ -281,9 +290,64 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
-    # print(law_topics_format_generator())
     # import_air()
-    # run_playwright()
+    # case = Case.objects.values('code').annotate(count=Count('code')).filter(count__gt=1)
+    # case_code = []
+    # for i in case:
+    #     case_code.append(i['code'])
+    # case = Case.objects.filter(code__in=case_code).distinct('code')
+    # # print(case)
+    # for i in case:
+    #     print(f"{i}--{i.code}")
+    #     print()
+    #     i.delete
+    ###Long text remove para
+    # First, define the list of zeros
+    # caseparagraphs = Caseparagraph.objects.filter(embeddings=np.zeros(3072))
+    # print(caseparagraphs)
+    # case = Case.onjects.all()
+    # for case in case:
+    #     for para in case.citations:
+    #         print(para)
+    #     print()
+    # index = 1
+    # for case_note in case_notes:
+    #     pattern = r"\(Para[^)]*\)"
+    #     case_note.short_text = case_note.short_text.replace("\n", '')
+    #     case_note.short_text = case_note.short_text.replace("\t", '')
+    #     case_note.short_text = re.sub(pattern, "", case_note.short_text)
+    #     case_note.save()
+    #     index += 1
+    ### Removing the number from paragraph text and adding the number in the apra_count
+    # case_notes = Caseparagraph.objects.all()
+    # id_list = []
+    # for case in case_notes:
+    #     print(case.id)
+    #     match = re.search(r'^\s*(\d+(?:\.\d+)?)', case.text)
+    #     try:
+    #         case.para_count = match.group(0)
+    #         case.text = case.text.replace(f"{match.group(0)}.",'')
+    #         # print('TEXT::', text_value)
+    #         # print("PARA:: COunt::", case.para_count)
+    #         print()
+    #         case.save()
+    #         id_list.append(case.id)
+    #     except:
+    #         print("not working")
+    #         print('not working TEXT::', case.text)
+    #         print("not working PARA:::", case.para_count)
+    #         print()
+    # print("Final List::", id_list)
+    # case_notes_with_keywords = []
+    # for case_note in case_notes:
+    #     keywords = open_ai_keyword_api(case_note.short_text)
+    #     case_note.keywords = keywords
+    #     case_notes_with_keywords.append(case_note)
+
+    # with transaction.atomic():
+    #     for case_note in case_notes_with_keywords:
+    #         case_note.save()
+
     csrf_token = get_token(request)
     return render(request, "brief_argument/main_page.html", {"csrf_token": csrf_token})
 
@@ -484,8 +548,35 @@ def legal_memo_frontend(request, legal_memo_id):
 
 
 def legal_search(request):
+    # open_ai_keyword_api(
+    #     "(D) Special Marriage Act (43 of 1954) , S.4— Solemnisation of marriage - For same-sex couples - By reading down of statutory provisions - Provision of SMA cannot be read as 'gender neutral' provision - Right to marry cannot be read into provisions of SMA, so as to include same sex marriages - SMA to include marriages between heterosexual relationships only. DOCTRINE - Doctrine of 'reading down' - Applicability.In the instant case, the petitioners sought permission for same-sex couples to solemnise their marriages under the Special Marriage Act, by applying doctrine of reading down to statutory provisions. Held, provision of Special Marriage Act (SMA) cannot be read as 'gender neutral' provision. Right to marry cannot be read into provisions of SMA, so as to include same sex marriages. SMA to include marriages between heterosexual relationships only. (Per Dr. Dhananjaya Chandrachud, C.J.I.) - The judicial legislation is impermissible. Reading words into the provisions of the SMA and provisions of other allied laws would essentially entail delving into the realm of the legislature. The Court is not equipped to undertake an exercise of such wide amplitude because of its institutional limitations. The court usually first determines if the law is unconstitutional, and then proceeds to decide on the relief. However, in this case, an exercise to determine whether the SMA is unconstitutional because of under-inclusivity would be futile because of the limitations of this Court's power to grant a remedy. Whether a change should be brought into the legislative regime of the SMA is for Parliament to determine. Parliament has access to varied sources of information and represents in itself a diversity of viewpoints in the polity. The Court in the exercise of the power of judicial review must be careful not to tread into the legislative domain.                (Sanjay Kishan Kaul, J. ) - Reading into the statute is beyond the powers of judicial review and would be under the legislative domain. It would also not be prudent to suspend or strike down the SMA, given that it is a beneficial legislation and is regularly and routinely used by heterosexual partners desirous of getting married. For this reason, this particular methodology of recognising the right of non-heterosexual partners to enter into a civil union, as opposed to striking down provisions of the SMA, ought to be considered as necessarily exceptional in nature. It should not restrict the Courts while assessing such deep-seated forms of discrimination in the future                (Per S. Ravindra Bhat, Hima Kohli, and Pamidighantam Sri Narasimha, JJ. ) - The provisions of SMA are incapable of being 'reading down', or interpreted by 'reading up' in the manner suggested by the petitioners. S. 4 of SMA (conditions relating to solemnization of special marriages), contemplates marriages between a man and a woman. To read SMA in any other manner would be contrary to established principles of statutory interpretation as discussed in preceding paragraphs. It is also not permissible for the court to 'read up' and substitute the words 'any two persons' to refer to a marriage between non-heterosexual couples. Furthermore, if provisions of SMA are to be construed as gender neutral (such as persons or spouses, in substitution of wife and husband) as the petitioners propose, it would be possible for a cis-woman's husband to file a case or create a narrative to manipulate the situation. Gender neutral interpretation of existing laws, therefore, would complicate an already exhausting path to justice for women and leave room for the perpetrator to victimise them. A law is not merely meant to look good on paper; but is an effective tool to remedy a perceived injustice, addressed after due evaluation about its necessity. A law which was consciously created and fought for, by women cannot, therefore, by an interpretive sleight be diluted."
+    # )
+    # keyword_list = []
+    # case = CaseNote.objects.all()
+    # index = 0
+    # for cas in case:
+    #     keyword = open_ai_keyword_api(cas)
+    #     cas.keyword = keyword
+    #     keyword_list.append(cas)
+    #     index += 1
+    #     print(index)
+    # CaseNote.objects.bulk_update(keyword_list, ['keyword'])
+    # print("keyword done::")
+    # print()
+    # print("Now Keyword Embeddings:")
+    # keyword_list = []
+    # index = 0
+    # for case in case:
+    #     embedding = openai.embeddings.create(
+    #         input=[case.keyword], model="text-embedding-3-large"
+    #     )
+    #     cas.keyword_embeddings = embedding.data[0].embedding
+    #     keyword_list.append(cas)
+    #     index += 1
+    #     print(index)
+    # CaseNote.objects.bulk_update(keyword_list, ['keyword_embeddings'])
     csrf_token = get_token(request)
     context = {
         "csrf_token": csrf_token,
     }
-    return render(request, "brief_argument/legal_search.html", context)
+    return render(request, "brief_argument/legal_search_2.html", context)

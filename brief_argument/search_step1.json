@@ -1,0 +1,62 @@
+[
+    {
+        "id": 123,
+        "case": "AIR 2023 SUPREME COURT 49",
+        "respondent_name": "Mehdi Hasan (Deceased) Thr. LR.s.",
+        "petitioner_name": "Lucknow Development Authority",
+        "court": "Supreme Court of India",
+        "ratio_score": 0.8,
+        "paragraph_value": [
+            {
+                "id": 1,
+                "text": "On behalf of the state, it was argued by Mr. Yashraj Singh Bundela, learned counsel, that no interference with the concurrent findings of the courts below is called for and that the appeal involves appreciation of evidence. As there is nothing that can be termed as perverse or unreasonable as regards these findings, which are based on the evidence led, this court should not exercise its discretionary jurisdiction to upset or interfere with the findings.",
+                "para_score": 0.6
+            },
+            {
+                "id": 2,
+                "text": "It is submitted that the appellant is a manufacturer of crown corks used for sealing glass bottles. Initially, it was producing 'Spun Line Crown Corks'. However, subsequently, it diversified the manufacturing activity to manufacture 'Double Lip Dry Blend Crowns' for which it imported new plant and machinery and invested a fixed capital cost of Rs. 4.5 crores.",
+                "para_score": 0.9
+            }
+        ]
+    },
+    {
+        "id": 456,
+        "case": "AIR 2023 SUPREME COURT 163",
+        "respondent_name": "Rohtash Singh",
+        "petitioner_name": "Desh Raj ",
+        "court": "Supreme Court of India",
+        "ratio_score": 0.6,
+        "paragraph_value": [
+            {
+                "id": 1,
+                "text": "Per contra, the Appellants have heavily relied on the following passage of the decision of this Court in Satish Batra11to justify the forfeiture of earnest money -          '15. The law is, therefore, clear that to justify the forfeiture of advance money being part of 'earnest money' the terms of the contract should be clear and explicit. Earnest money is paid or given at the time when the contract is entered into and, as a pledge for its due performance by the depositor to be forfeited in case of non-performance by the depositor. There can be converse situation also that if the seller fails to perform the contract the purchaser can also get double the amount, if it is so stipulated. It is also the law that part-payment of purchase price cannot be forfeited unless it is a guarantee for the due performance of the contract. In other words, if the payment is made only towards part-payment of consideration and not intended as earnest money then the forfeiture clause will not apply.' In sum and substance, the Apply.'          In sum and substance, the Appellants contend that forfeiture of sum is justified when it is - (a) clearly stipulated as earnest money; (b) forms part of sale consideration and (c) intended to be in the nature of 'guarantee for the due performance of the contract', and (d) the binding agreement between the parties provides its forfeiture in the event of breach of contract.",
+                "para_score": 0.6
+            },
+            {
+                "id": 2,
+                "text": "Therefore, in light of the abovementioned discussions, it can be seen that the practice of filing preliminary reports before the enactment of the present CrPC has now taken the form of filing charge-sheets without actually completing the investigation, only to scuttle the right of default bail. If we were to hold that charge-sheets can be filed without completing the investigation, and the same can be used for prolonging remand, it would in effect negate the purpose of introducing section 167(2) of the CrPC and ensure that the fundamental rights guaranteed to accused persons is violated.           28.We have carefully perused the judgments relied upon by the learned counsel for the respondent, however, none of the judgments relied upon permit the abuse of remand under Section 309(2) of the CrPC by permitting the filing of incomplete charge-sheets only to scuttle the right of statutory bail.",
+                "para_score": 0.9
+            }
+        ]
+    },
+    {
+        "id": 789,
+        "case": "AIR 2023 SUPREME COURT 44",
+        "respondent_name": "Lokendra Rathod",
+        "petitioner_name": "Smt. Anjali ",
+        "court": "Supreme Court of India",
+        "ratio_score": 0.5,
+        "paragraph_value": [
+            {
+                "id": 1,
+                "text": "The Appellants are the heirs and legal representatives of Rajesh (deceased) who died as a result of a motor accident on 15th August 2010. He was travelling in a Maruti Alto Car bearing Registration No. MP-09- HE-3322, on reaching Badwah Road, a bus bearing Registration No. MP- 09-FA-3169 being driven by Respondent No.2 in a rash and negligent manner crashed into the Rajesh's car, resulting in Rajesh (deceased) receiving grievous injuries on various body parts, he later succumbed to the injuries during treatment. He is survived by his two          wives, three children and his parents, who are the appellants before this Court.",
+                "para_score": 0.6
+            },
+            {
+                "id": 2,
+                "text": "This is the second paragraph with some relevant details.",
+                "para_score": 0.9
+            }
+        ]
+    }
+]

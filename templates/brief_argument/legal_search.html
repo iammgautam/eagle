@@ -19,10 +19,18 @@
         <h3>Relevant Results of Case Laws and Statues:</h3>
         <ul>
             <li v-for="(item, index) in results" :key="index">
-                <h3>[[ item.score_value ]]</h3>
-                <h3>[[ item.doc_name ]]</h3>
-                <br>
-                <p>[[ item.passage ]]</p>
+                <h3>CASE ID::: [[ item.id ]]</h3>
+                <h3> Case Note::</h3>
+                <p>[[ item.case_note ]]</p>
+                <h3> Ratio Paragraph Case::</h3>
+                <p>[[ item.ratio_score ]]</p>
+                <div v-if="item.paragraph_value" v-for="(para, para_index) in item.paragraph_value" :key="para_index">
+                    <h3> Para Text:</h3>
+                    <p>[[ para.text ]]</p>
+                    <h3> Para Score:</h3>
+                    <p>[[ para.para_score]] </p>
+                    <br><br>
+                </div>
             </li>
         </ul>
     </div>
@@ -80,7 +88,7 @@
             const search_api = () => {
                 const textarea = document.getElementById('legal_search');
                 console.log("Constance");
-                axios.post('/api/statement/search/', {
+                axios.post('/api/lexipro/search1/step_1_search/', {
                     search_text: textarea.value,
                 }, {
                     headers: {
