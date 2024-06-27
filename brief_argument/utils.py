@@ -1,18 +1,28 @@
 import re
 import docx
+import ast
 import os
+import cohere
+from brief_argument.models import default_embeddings
 import openai
 from openai import OpenAI
 import google.generativeai as genai
 import lxml.etree
 import numpy as np
 from django.template.loader import render_to_string
+from django.db.models import Q, Prefetch, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
 from brief_argument.scraper2 import run_playwright
 from legal_gpt import settings
 from case_history.models import LawTopics
-from brief_argument.models import HulsburyLawBooks, Case, CaseNote, Caseparagraph
+from brief_argument.models import (
+    HulsburyLawBooks,
+    Case,
+    CaseNote,
+    Caseparagraph,
+    caseNotesKeyword,
+)
 from legal_gpt import settings
 from .main3 import final_function, process_documents, process_query, query_documents
 
@@ -972,7 +982,10 @@ def open_ai_keyword_api(input_text):
     response = client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {
+                "role": "system",
+                "content": "You are a legal researcher tasked with suggesting individual searchable key phrases to perform legal research for a particular legal issue.",
+            },
             {"role": "user", "content": prompt},
         ],
         max_tokens=150,
@@ -984,7 +997,126 @@ def open_ai_keyword_api(input_text):
     result = response.choices[0].message.content.replace("\n", "")
     result = result.replace("```", "")
     result = result.replace("json", "")
-    print(result, type(result))
-    # result = result.split()
-    # print(result, type(result))
+    try:
+        terms = ast.literal_eval(result)
+    except:
+        return None
+    return terms
+
+
+def para_embedd():
+
+    openai.api_key = os.getenv("OPEN_AI")
+    cases = Case.objects.all().prefetch_related(
+        Prefetch(
+            "case_note",
+            queryset=CaseNote.objects.prefetch_related("paragraph"),
+            to_attr="case_notes_query",
+        )
+    )
+    case_value = 0
+    for case in cases:
+        case_value = case_value + 1
+        case_note_para = set()
+        citation_paragraphs = set()
+        for case_note in case.case_notes_query:
+            for para in case_note.paragraph.all():
+                case_note_para.add(para.para_count)
+        for item in case.citations:
+            if item["paragraph"] is not None:
+                citation_paragraphs.update(item["paragraph"])
+        combined_set = list(case_note_para.union(citation_paragraphs))
+        para_obj = Caseparagraph.objects.filter(
+            para_count__in=combined_set, case=case, embeddings=default_embeddings
+        )
+        index = 0
+        for para in para_obj:
+            try:
+                embedding = openai.embeddings.create(
+                    input=[para.text], model="text-embedding-3-large"
+                )
+                para.embeddings = embedding.data[0].embedding
+                para.save()
+                index = index +1
+            except Exception as e:
+                truncate_text = get_first_4000_words(para.text)
+                print(para.id)
+                print(truncate_text)
+                print()
+                embedding = openai.embeddings.create(
+                    input=[truncate_text], model="text-embedding-3-large"
+                )
+                para.embeddings = embedding.data[0].embedding
+                para.save()
+                index = index +1
+    return True
+
+
+def keyword_and_embedding():
+    openai.api_key = os.getenv("OPEN_AI")
+    index = 0
+    case_notes = CaseNote.objects.exclude(~Q(embeddings=default_embeddings))
+    # print(case_notes.count())
+    for case_note in case_notes:
+        embedding = openai.embeddings.create(
+            input=[case_note.short_text], model="text-embedding-3-large"
+        )
+        case_note.embeddings = embedding.data[0].embedding
+        case_note.save()
+        index += 1
+        print("Case Notes::", index)
+        # keyword_create_list = []
+        # keyword = open_ai_keyword_api(case_note.short_text)
+        # if keyword is not None:
+        #     for key in keyword:
+        #         co = cohere.Client("<<apiKey>>")
+
+        #         response = co.embed(
+        #             texts=[case_note.short], model="embed-english-v3.0", input_type="classification"
+        #         )
+        #         embedding = openai.embeddings.create(
+        #             input=[key], model="text-embedding-3-large"
+        #         )
+        #         keyword_create_list.append(
+        #             {
+        #                 "keyword": key,
+        #                 "embedding": embedding.data[0].embedding,
+        #             }
+        #         )
+        #     relevant_passage = [
+        #         caseNotesKeyword(**key_item, case_note=case_note) for key_item in keyword_create_list
+        #     ]
+        #     caseNotesKeyword.objects.bulk_create(relevant_passage)
+        #     index += 1
+        #     print("CASE DONE:::",index)
+
+
+def del_duplicates():
+    # case = Case.objects.values('code').annotate(count=Count('code')).filter(count__gt=1)
+    # print(case)
+    # case_name = set()
+    # for c in case:
+    #     case_name.add(c["code"])
+    # case_name = list(case_name)
+    # for case in case_name:
+    #     case_obj = Case.objects.filter(code=case)
+    #     print(case_obj, case_obj.count())
+    #     first_case = case_obj.first()
+    #     print(first_case)
+    #     first_case.delete()
+    para = Caseparagraph.objects.all()
+    index = 0
+    for p in para:
+        # have_space = p.para_count.strip()
+        # if p.para_count != have_space:
+        p.para_count = p.para_count.strip()
+        p.save()
+        index += 1
+        print("index:", index)
+
+
+def get_first_4000_words(text):
+    words = text.split()
+    first_4000 = words[:4000]
+    result = ' '.join(first_4000)
     return result

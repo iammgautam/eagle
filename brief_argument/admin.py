@@ -6,7 +6,7 @@ from .models import (
     HulsburyLawBooks,
     RelevantCitationsPassage,
     StatementEmbeddings,
-    Case,CaseNote, Caseparagraph
+    Case,CaseNote, Caseparagraph, caseNotesKeyword
 )
 
 
@@ -104,3 +104,13 @@ class CaseparagraphAdmin(admin.ModelAdmin):
         "modified_date",
     )
     search_fields = ("case","text")
+
+
+@admin.register(caseNotesKeyword)
+class caseNotesKeywordAdmin(admin.ModelAdmin):
+    list_display = ("id", "keyword",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+    )
+    search_fields = ("keyword",)

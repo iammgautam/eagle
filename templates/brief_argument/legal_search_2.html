@@ -173,16 +173,16 @@
                             <div class="overflow-y-auto leading-relaxed text-[#050142] font-inter"
                                 style="max-height: 460px; font-size: 14px;">
                                 <ul>
-                                    <li v-for="(citation, index) in sortedCitations" :key="index" :class="[
+                                    <li v-for="(citation, index) in citations" :key="index" :class="[
                           'my-3 cursor-pointer hover:underline',
                           {
                             'font-bold text-[#050142]': index === selectedCitation,
                           },
                         ]" @click="selectCitation(index)">
                                         <div>
-                                            <span class="text-blue-600">[[ citation.petitioner_name ]]</span>
+                                            <span class="text-blue-600">[[ citation.petitioner ]]</span>
                                             <span class="text-gray-700"> v. </span>
-                                            <span class="text-red-600">[[ citation.respondent_name ]]</span>
+                                            <span class="text-red-600">[[ citation.respondent ]]</span>
                                         </div>
                                         <div class="text-sm text-gray-600">in The [[ citation.court ]], 2023</div>
                                     </li>
@@ -194,8 +194,8 @@
                             <div class="overflow-y-auto" style="max-height: 460px">
                                 <div v-if="selectedCitation !== null">
                                     <div v-for="(paragraph, index) in sortedParagraphs" :key="index" :class="[
-                          'bg-[#F3F4ED] text-[#28261B] shadow-sm border border-gray-200 hover:border hover:border-none rounded-lg p-4 mb-4 leading-relaxed relative text-justify',
-                          { 'font-bold': paragraph.isHighest }
+                          'text-[#28261B] shadow-sm border border-gray-200 hover:border hover:border-none rounded-lg p-4 mb-4 leading-relaxed relative text-justify',
+                          { 'font-bold': paragraph.isHighest , 'bg-[#F3F4ED]': paragraph.isHighest}
                         ]" style="font-size: 14px; height: auto;">
                                         <div class="overflow-y-auto h-full pr-8">
                                             <!-- @click="openReaderView(paragraph.text)"> -->
@@ -283,19 +283,15 @@
                 animateSentences();
             });
 
-            const sortedCitations = computed(() => {
-                return [...citations.value].sort((a, b) => b.ratio_score - a.ratio_score);
-            });
-
             const sortedParagraphs = computed(() => {
                 if (selectedCitation.value === null) return [];
 
-                const paragraphs = sortedCitations.value[selectedCitation.value].paragraph_value;
-                const highestScore = Math.max(...paragraphs.map(p => p.para_score));
+                const paragraphs = citations.value[selectedCitation.value].paragraphs;
+                const average_score = citations.value[selectedCitation.value].case_note_average_score;
 
                 return paragraphs.map(p => ({
                     ...p,
-                    isHighest: p.para_score === highestScore
+                    isHighest: p.para_score < average_score
                 }));
             });
 
@@ -377,7 +373,7 @@
             return {
                 citations,
                 selectedCitation,
-                sortedCitations,
+                // sortedCitations,
                 sortedParagraphs,
                 selectCitation,
                 copyToClipboard,

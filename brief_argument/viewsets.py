@@ -1,4 +1,5 @@
 import openai
+import os
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.db.models import Prefetch, Avg
@@ -275,17 +276,20 @@ class CaseViewsets(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def step_1_search(self, request):
+        openai.api_key = os.getenv("OPEN_AI")
         search_text = request.data.get("search_text")
         search_text_embeddings = openai.embeddings.create(
             input=[search_text], model="text-embedding-3-large"
         )
+        # print("QUERY::", search_text_embeddings)
+        # print("QUERY EMBEDDING::", search_text_embeddings.data[0].embedding)
         case_notes = (
             CaseNote.objects.annotate(
                 case_note_score=CosineDistance(
                     "embeddings", search_text_embeddings.data[0].embedding
                 )
             )
-            .order_by("case_note_score")[:10]
+            .order_by("case_note_score")[:20]
             .prefetch_related(
                 Prefetch(
                     "paragraph",
@@ -295,44 +299,106 @@ class CaseViewsets(viewsets.ModelViewSet):
                         ),
                     ),
                     to_attr="paragraph_value",
-                )
+                ),
+                Prefetch(
+                    "case",
+                    queryset=Case.objects.all().prefetch_related(
+                        "paragraph",
+                        Prefetch(
+                            "case_note",
+                            queryset=CaseNote.objects.prefetch_related("paragraph"),
+                            to_attr="case_notes_query",
+                        ),
+                    ),
+                    to_attr="case_query",
+                ),
             )
         )
         result = []
+        para_score_list = []
+        index = 0
         for case_note in case_notes:
-            para_score_sum = 0
-            index = 0
-            para_list = []
             for para in case_note.paragraph_value:
-                para_list.append(
-                    {
-                        "id": para.id,
-                        "text": para.text,
-                        "para_score": para.para_score,
-                    }
-                )
-                para_score_sum += para.para_score
+                para_score_list.append(para.para_score)
                 index += 1
-            ratio_score = para_score_sum / index
+            selected_paragraphs = self.get_selected_parapgraphs(
+                case_note.case_query, case_note.embeddings
+            )
+            case_paragraphs = self.get_all_case_paragraphs(case_note.case_query)
+            para_list = []
+            selected_para_ids = set()
+            para_list = [
+                {
+                    "id": para.id,
+                    "number":int(para.number),
+                    "text": para.text.strip(),
+                    "para_score": para.selected_para_score,
+                }
+                for para in selected_paragraphs
+            ]
+            selected_para_ids.update(para.id for para in selected_paragraphs)
+            para_list.extend(
+                {
+                    "id": para.id,
+                    "number":int(para.number),
+                    "text": para.text.strip(),
+                    "para_score": 1,
+                }
+                for para in case_paragraphs
+                if para.id not in selected_para_ids
+            )
+            para_list.sort(key=lambda x: x["number"])
             result.append(
                 {
-                    "id": case_note.id,
-                    "case_note": case_note.short_text,
-                    "case": case_note.case.code,
-                    "respondent_name": case_note.case.petitioner,
-                    "petitioner_name": case_note.case.respondent,
+                    "id":case_note.case.id,
+                    "respondent": case_note.case.respondent,
+                    "petitioner": case_note.case.petitioner,
                     "court": case_note.case.court,
-                    "ratio_score": ratio_score,
-                    "paragraph_value": para_list,
+                    "case_note_score": case_note.case_note_score,
+                    "paragraphs": para_list,
                 }
             )
-        result = sorted(result, key=lambda x: x["ratio_score"], reverse=True)
+        # print("Index::", index)
+        # print("PARA Score::", para_score_sum)
+        distinct_result = {item['id']: item for item in result}.values()
+        distinct_result = list(distinct_result)
+        result = sorted(
+            [
+                {**item, "case_note_average_score": min(para_score_list)
+}
+                for item in distinct_result
+            ],
+            key=lambda x: x["case_note_score"],
+            reverse=False,
+        )
 
         return Response({"result": result}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['POST'])
+    @action(detail=False, methods=["POST"])
     def step_1_search_2(self, request):
         search_text = request.data.get("search_text")
         search_text_embeddings = openai.embeddings.create(
             input=[search_text], model="text-embedding-3-large"
         )
+
+    def get_selected_parapgraphs(self, case, query_embedding):
+        case_note_para = set()
+        citation_paragraphs = set()
+        for case_note in case.case_notes_query:
+            for para in case_note.paragraph.all():
+                case_note_para.add(para.para_count)
+        for item in case.citations:
+            if item["paragraph"] is not None:
+                citation_paragraphs.update(item["paragraph"])
+        combined_set = list(case_note_para.union(citation_paragraphs))
+        return (
+            Caseparagraph.objects.filter(
+                para_count__in=combined_set,
+                case=case,
+            )
+            .annotate(selected_para_score=CosineDistance("embeddings", query_embedding))
+            .order_by("selected_para_score")
+        )
+
+    def get_all_case_paragraphs(self, case):
+        return case.paragraph.all()
