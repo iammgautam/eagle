@@ -2,7 +2,7 @@ import openai
 import os
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from django.db.models import Prefetch, Avg
+from django.db.models import Prefetch
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -281,8 +281,6 @@ class CaseViewsets(viewsets.ModelViewSet):
         search_text_embeddings = openai.embeddings.create(
             input=[search_text], model="text-embedding-3-large"
         )
-        # print("QUERY::", search_text_embeddings)
-        # print("QUERY EMBEDDING::", search_text_embeddings.data[0].embedding)
         case_notes = (
             CaseNote.objects.annotate(
                 case_note_score=CosineDistance(
@@ -321,6 +319,8 @@ class CaseViewsets(viewsets.ModelViewSet):
             for para in case_note.paragraph_value:
                 para_score_list.append(para.para_score)
                 index += 1
+        case_note_average_score = min(para_score_list)
+        for case_note in case_notes:
             selected_paragraphs = self.get_selected_parapgraphs(
                 case_note.case_query, case_note.embeddings
             )
@@ -330,9 +330,10 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list = [
                 {
                     "id": para.id,
-                    "number":int(para.number),
-                    "text": para.text.strip(),
-                    "para_score": para.selected_para_score,
+                    "number": int(para.number),
+                    "para_score": (
+                        1 if para.selected_para_score < case_note_average_score else 0
+                    ),
                 }
                 for para in selected_paragraphs
             ]
@@ -340,37 +341,34 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list.extend(
                 {
                     "id": para.id,
-                    "number":int(para.number),
-                    "text": para.text.strip(),
-                    "para_score": 1,
+                    "number": int(para.number),
+                    "para_score": 0,
                 }
                 for para in case_paragraphs
                 if para.id not in selected_para_ids
             )
             para_list.sort(key=lambda x: x["number"])
+            for para in para_list:
+                del para["number"]
+
             result.append(
                 {
-                    "id":case_note.case.id,
-                    "respondent": case_note.case.respondent,
-                    "petitioner": case_note.case.petitioner,
-                    "court": case_note.case.court,
+                    "id": case_note.id,
                     "case_note_score": case_note.case_note_score,
                     "paragraphs": para_list,
                 }
             )
-        # print("Index::", index)
-        # print("PARA Score::", para_score_sum)
-        distinct_result = {item['id']: item for item in result}.values()
-        distinct_result = list(distinct_result)
         result = sorted(
             [
-                {**item, "case_note_average_score": min(para_score_list)
-}
-                for item in distinct_result
+                {**item, "case_note_average_score": min(para_score_list)}
+                for item in result
             ],
             key=lambda x: x["case_note_score"],
             reverse=False,
         )
+        for para in result:
+            del para["case_note_score"]
+            del para["case_note_average_score"]
 
         return Response({"result": result}, status=status.HTTP_200_OK)
 

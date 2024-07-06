@@ -428,12 +428,6 @@ def step_3(request, legal_memo_id):
 
 
 def admin_home_page(request):
-    working = update_the_citation()
-    # filtered_content = read_word_doc(
-    #     "v:line",
-    #     "/Users/mithilesh/law/Animals/fwdanimals",
-    # )
-    # print("WHAT IS THIS::", working)
     case_history = CaseHistory.objects.filter(is_completed=False).order_by(
         "created_date"
     )

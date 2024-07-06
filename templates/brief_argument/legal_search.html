@@ -42,42 +42,6 @@
     const { createApp, ref, toRefs } = Vue;
     const csrftoken = '{{ csrf_token }}';
 
-    // createApp({
-    //     setup() {
-    //         const url = window.location.href;
-    //         const uuid = window.location.href.split('/');
-    //         const legal_search = ref('WORKING');
-    //         const results = ref([]);
-
-    //         const search_api = () => {
-    //             const textarea = document.getElementById('legal_search');
-    //             console.log("Constance");
-    //             axios.post('/api/statement/search/', {
-    //                 search_text: textarea.value,
-    //             }, {
-    //                 headers: {
-    //                     'X-CSRFToken': csrftoken
-    //                 }
-    //             }).then(response => {
-    //                 console.log("HAPPING", response.data.result);
-    //                 results.value = response.data.result
-    //             }).catch(error => {
-    //                 console.error(error);
-    //             });
-    //         };
-
-    //         return {
-    //             ...toRefs({
-    //                 search_api,
-    //             }),
-    //             legal_search,
-    //             results,
-    //         };
-    //     },
-    // })
-    // app.config.compilerOptions.delimiters = ["[[", "]]"];
-    // app.mount('#app')
-
     const app = createApp({
         setup() {
             const url = window.location.href;
