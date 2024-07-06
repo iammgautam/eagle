@@ -2,15 +2,13 @@ import re
 import docx
 import ast
 import os
-import cohere
 from brief_argument.models import default_embeddings
 import openai
 from openai import OpenAI
 import google.generativeai as genai
 import lxml.etree
-import numpy as np
 from django.template.loader import render_to_string
-from django.db.models import Q, Prefetch, Count
+from django.db.models import Q, Prefetch
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
 from brief_argument.scraper2 import run_playwright
@@ -21,11 +19,8 @@ from brief_argument.models import (
     Case,
     CaseNote,
     Caseparagraph,
-    caseNotesKeyword,
 )
 from legal_gpt import settings
-from .main3 import final_function, process_documents, process_query, query_documents
-
 INPUT_TOPICS = """Law 1 Constitutional Law:
     Topic 1.01 Constitution and Constitutionalism Size:14102,
     Topic 1.02 Nature of Indian Constitution and Concept of Federalism Size:20192,

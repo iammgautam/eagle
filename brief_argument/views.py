@@ -1,13 +1,6 @@
 import re
 import json
 import openai
-import cohere
-import numpy as np
-from django.db import transaction
-from django.db.models import Func, Value, FloatField, Count, Max, TextField
-from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q
-from django.db.models.functions import Cast
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import get_token
 from django.utils.safestring import mark_safe
@@ -28,9 +21,6 @@ from .models import (
     HulsburyLawBooks,
     StatementEmbeddings,
     RelevantCitationsPassage,
-    Case,
-    CaseNote,
-    Caseparagraph,
 )
 from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
