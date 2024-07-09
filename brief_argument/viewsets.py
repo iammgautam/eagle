@@ -330,6 +330,7 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list = [
                 {
                     "id": para.id,
+                    "text": para.text,
                     "number": int(para.number),
                     "para_score": (
                         1 if para.selected_para_score < case_note_average_score else 0
@@ -341,6 +342,7 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list.extend(
                 {
                     "id": para.id,
+                    "text": para.text,
                     "number": int(para.number),
                     "para_score": 0,
                 }
@@ -353,7 +355,11 @@ class CaseViewsets(viewsets.ModelViewSet):
 
             result.append(
                 {
-                    "id": case_note.id,
+                    "case_id": case_note.case.id,
+                    "case_court": case_note.case.court,
+                    "case_judges": case_note.case.judges,
+                    "case_petitioner": case_note.case.petitioner,
+                    "case_respondent": case_note.case.respondent,
                     "case_note_score": case_note.case_note_score,
                     "paragraphs": para_list,
                 }
