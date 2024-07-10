@@ -387,6 +387,110 @@ class CaseViewsets(viewsets.ModelViewSet):
             del para["case_note_average_score"]
 
         return Response({"result": result}, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=["POST"])
+    def case_search_1(self, request):
+        openai.api_key = os.getenv("OPEN_AI")
+        search_text = request.data.get("search_text")
+        search_text_embeddings = openai.embeddings.create(
+            input=[search_text], model="text-embedding-3-large"
+        )
+        case_notes = (
+            CaseNote.objects.annotate(
+                case_note_score=CosineDistance(
+                    "embeddings", search_text_embeddings.data[0].embedding
+                )
+            )
+            .order_by("case_note_score")[:20]
+            .prefetch_related(
+                Prefetch(
+                    "paragraph",
+                    queryset=Caseparagraph.objects.annotate(
+                        para_score=CosineDistance(
+                            "embeddings", search_text_embeddings.data[0].embedding
+                        ),
+                    ),
+                    to_attr="paragraph_value",
+                ),
+                Prefetch(
+                    "case",
+                    queryset=Case.objects.all().prefetch_related(
+                        "paragraph",
+                        Prefetch(
+                            "case_note",
+                            queryset=CaseNote.objects.prefetch_related("paragraph"),
+                            to_attr="case_notes_query",
+                        ),
+                    ),
+                    to_attr="case_query",
+                ),
+            )
+        )
+        result = []
+        para_score_list = []
+        index = 0
+        for case_note in case_notes:
+            for para in case_note.paragraph_value:
+                para_score_list.append(para.para_score)
+                index += 1
+        case_note_average_score = min(para_score_list)
+        for case_note in case_notes:
+            selected_paragraphs = self.get_selected_parapgraphs(
+                case_note.case_query, case_note.embeddings
+            )
+            case_paragraphs = self.get_all_case_paragraphs(case_note.case_query)
+            para_list = []
+            selected_para_ids = set()
+            para_list = [
+                {
+                    "id": para.id,
+                    "text": para.text,
+                    "number": int(para.number),
+                    "para_score": (
+                        1 if para.selected_para_score < case_note_average_score else 0
+                    ),
+                }
+                for para in selected_paragraphs
+            ]
+            selected_para_ids.update(para.id for para in selected_paragraphs)
+            para_list.extend(
+                {
+                    "id": para.id,
+                    "text": para.text,
+                    "number": int(para.number),
+                    "para_score": 0,
+                }
+                for para in case_paragraphs
+                if para.id not in selected_para_ids
+            )
+            para_list.sort(key=lambda x: x["number"])
+            for para in para_list:
+                del para["number"]
+
+            result.append(
+                {
+                    "case_id": case_note.case.id,
+                    "petitioner": case_note.case.petitioner,
+                    "respondent": case_note.case.respondent,
+                    "court": case_note.case.court,
+                    "judges": case_note.case.judges,
+                    "case_note_score": case_note.case_note_score,
+                    "paragraphs": para_list,
+                }
+            )
+        result = sorted(
+            [
+                {**item, "case_note_average_score": min(para_score_list)}
+                for item in result
+            ],
+            key=lambda x: x["case_note_score"],
+            reverse=False,
+        )
+        for para in result:
+            del para["case_note_score"]
+            del para["case_note_average_score"]
+
+        return Response({"result": result}, status=status.HTTP_200_OK)
 
     def get_selected_parapgraphs(self, case, query_embedding):
         case_note_para = set()

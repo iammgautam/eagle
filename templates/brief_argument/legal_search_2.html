@@ -184,7 +184,7 @@
                                             <span class="text-gray-700"> v. </span>
                                             <span class="text-red-600">[[ citation.respondent ]]</span>
                                         </div>
-                                        <div class="text-sm text-gray-600">in The [[ citation.court ]], 2023</div>
+                                        <div class="text-sm text-gray-600">in The [[ citation.court ]], </div>
                                     </li>
                                 </ul>
                             </div>
@@ -263,14 +263,13 @@
 
             const search_api = () => {
                 console.log("Constance");
-                axios.post('/api/lexipro/search1/step_1_search/', {
+                axios.post('/api/lexplore/case_search_1/', {
                     search_text: searchQuery.value,
                 }, {
                     headers: {
                         'X-CSRFToken': csrftoken
                     }
                 }).then(response => {
-                    console.log("HAPPING", response.data.result);
                     citations.value = response.data.result;
                     is_result.value = true;
                 }).catch(error => {
@@ -291,7 +290,7 @@
 
                 return paragraphs.map(p => ({
                     ...p,
-                    isHighest: p.para_score < average_score
+                    isHighest: p.para_score === 1
                 }));
             });
 
@@ -320,7 +319,7 @@
                 await nextTick();
             };
 
-            const typedSentence = ref("");
+            const typedSentence = ref("Searching...");
             const sentences = ref([
                 "The smartest way to legal research",
                 "Just enter the legal issue or a brief answer to any legal issue",
