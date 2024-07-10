@@ -370,6 +370,7 @@ class CaseViewsets(viewsets.ModelViewSet):
             result.append(
                 {
                     "case_id": case_note.case.id,
+                    "case_note_score": case_note.case_note_score,
                     "paragraphs": para_list,
                 }
             )
