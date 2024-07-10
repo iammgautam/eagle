@@ -206,3 +206,15 @@ class LegalResearchStep1Serializer(serializers.ModelSerializer):
             "case_note_score",
             "paragraph_value",
         ]
+
+class CaseParagraphSerializerValue(serializers.ModelSerializer):
+    class Meta:
+        model = Caseparagraph
+        fields = ('id', 'text')
+
+class CaseSerializerValue(serializers.ModelSerializer):
+    paragraph = CaseParagraphSerializerValue(many=True, read_only=True)
+
+    class Meta:
+        model = Case
+        fields = ('id', 'court', 'judges', 'petitioner', 'respondent', 'paragraph')

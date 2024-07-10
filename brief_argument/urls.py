@@ -34,7 +34,7 @@ router.register(r"law_books", HulsburyLawBooksViewsets)
 router.register(r"statement", StatementEmbeddingsViewsets)
 router.register(r"relevant_citations", RelevantCitationsPassageViewsets)
 router.register(r"legal_search", LegalSearchHistoryViewsets)
-router.register(r"lexipro/search1", CaseViewsets)
+router.register(r"lexplore", CaseViewsets)
 app_name = "brief_argument"
 
 urlpatterns = [

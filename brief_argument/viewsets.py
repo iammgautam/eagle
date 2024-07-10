@@ -1,5 +1,6 @@
 import openai
 import os
+import re
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.db.models import Prefetch
@@ -34,6 +35,7 @@ from .serializers import (
     CaseNoteSerializer,
     CaseSerializer,
     CaseparagraphSerializer,
+    CaseSerializerValue,
 )
 from .utils import (
     send_legal_memo_detail,
@@ -275,7 +277,21 @@ class CaseViewsets(viewsets.ModelViewSet):
     serializer_class = CaseparagraphSerializer
 
     @action(detail=False, methods=["POST"])
-    def step_1_search(self, request):
+    def case_text(self, request):
+        case_ids = request.data.get("case_ids")
+        queryset = self.get_queryset()
+        result = queryset.filter(id__in=case_ids).prefetch_related(
+            Prefetch(
+                "paragraph",
+                queryset=Caseparagraph.objects.all(),
+                to_attr="para_text",
+            )
+        )
+        serializer = CaseSerializerValue(result, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
+    def case_search(self, request):
         openai.api_key = os.getenv("OPEN_AI")
         search_text = request.data.get("search_text")
         search_text_embeddings = openai.embeddings.create(
@@ -330,7 +346,6 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list = [
                 {
                     "id": para.id,
-                    "text": para.text,
                     "number": int(para.number),
                     "para_score": (
                         1 if para.selected_para_score < case_note_average_score else 0
@@ -342,7 +357,6 @@ class CaseViewsets(viewsets.ModelViewSet):
             para_list.extend(
                 {
                     "id": para.id,
-                    "text": para.text,
                     "number": int(para.number),
                     "para_score": 0,
                 }
@@ -356,11 +370,6 @@ class CaseViewsets(viewsets.ModelViewSet):
             result.append(
                 {
                     "case_id": case_note.case.id,
-                    "case_court": case_note.case.court,
-                    "case_judges": case_note.case.judges,
-                    "case_petitioner": case_note.case.petitioner,
-                    "case_respondent": case_note.case.respondent,
-                    "case_note_score": case_note.case_note_score,
                     "paragraphs": para_list,
                 }
             )
@@ -377,13 +386,6 @@ class CaseViewsets(viewsets.ModelViewSet):
             del para["case_note_average_score"]
 
         return Response({"result": result}, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["POST"])
-    def step_1_search_2(self, request):
-        search_text = request.data.get("search_text")
-        search_text_embeddings = openai.embeddings.create(
-            input=[search_text], model="text-embedding-3-large"
-        )
 
     def get_selected_parapgraphs(self, case, query_embedding):
         case_note_para = set()
