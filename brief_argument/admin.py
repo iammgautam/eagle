@@ -6,7 +6,7 @@ from .models import (
     HulsburyLawBooks,
     RelevantCitationsPassage,
     StatementEmbeddings,
-    Case,CaseNote, Caseparagraph, caseNotesKeyword
+    Case,CaseNote, Caseparagraph, caseNotesKeyword, CoCounsel
 )
 
 
@@ -85,6 +85,11 @@ class CaseAdmin(admin.ModelAdmin):
     )
     search_fields = ("code",)
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "case_references":
+            kwargs["queryset"] = Case.objects.all()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(CaseNote)
 class CaseNoteAdmin(admin.ModelAdmin):
@@ -114,3 +119,12 @@ class caseNotesKeywordAdmin(admin.ModelAdmin):
         "modified_date",
     )
     search_fields = ("keyword",)
+
+@admin.register(CoCounsel)
+class CoCounselAdmin(admin.ModelAdmin):
+    list_display = ("id", "legal_issue",)
+    list_filter = (
+        "created_date",
+        "modified_date",
+        "is_completed",
+    )

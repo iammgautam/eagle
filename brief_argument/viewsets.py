@@ -21,6 +21,7 @@ from .models import (
     Case,
     CaseNote,
     Caseparagraph,
+    CoCounsel,
 )
 from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
@@ -36,12 +37,22 @@ from .serializers import (
     CaseSerializer,
     CaseparagraphSerializer,
     CaseSerializerValue,
+    CoCounselSerializers,
 )
 from .utils import (
+    get_research_and_query,
+    get_sof_and_question,
+    get_step4_output_formatter,
+    get_top_cases,
+    legal_memo_formatter,
+    perplexity_scrape,
     send_legal_memo_detail,
     relevent_topics_input_generator,
     send_aib_mail,
     step_2_output_formatter,
+    step_2_output_formatter_part2,
+    get_selected_parapgraphs,
+    get_all_case_paragraphs,
 )
 
 
@@ -52,32 +63,27 @@ class ArgumentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         bulk_update = []
         for analysis in request.data.get("detailed_analysis"):
-            formatted_analysis = re.search(
-                r"&lt;subsection&gt;(.*?)&lt;\/subsection&gt;",
-                analysis["detailed_content"],
-                re.DOTALL,
-            ).group(1)
-            formatted_analysis = formatted_analysis.replace("|$|", "")
-            bulk_update.append(
-                Argument(id=analysis["id"], detailed_content=formatted_analysis)
+            print("TEXT:::", analysis["detailed_content"])
+            match = (
+                re.search(
+                    "&lt;&lt;.*?&gt;&gt;((?:(?!&lt;&lt;).)*?)&lt;&lt;/.*?&gt;&gt;",
+                    analysis["detailed_content"],
+                )
+                .group(1)
+                .strip()
             )
+            print("VALUESS:::", match)
+            bulk_update.append(Argument(id=analysis["id"], detailed_content=match))
         Argument.objects.bulk_update(
             bulk_update,
             fields=[
                 "detailed_content",
             ],
         )
-        legal_memo = Legal_Memorandum.objects.get(id=request.data.get("legal_memo"))
-
-        # send mail (detailed legal_memo)
-        send_legal_memo_detail(legal_memo)
-
-        legal_memo.case_history.is_completed = True
-        legal_memo.case_history.save()
-
         return HttpResponseRedirect(
             reverse(
-                "brief_argument:admin_home_page",
+                "brief_argument:step_4",
+                kwargs={"legal_memo_id": request.data.get("legal_memo")},
             )
         )
 
@@ -156,11 +162,9 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
     serializer_class = LegalMemorandumSerializer
 
     def create(self, request, *args, **kwargs):
-        input_relevant_topic = relevent_topics_input_generator(
-            request.data.get("research_output"), aib=False
-        )
+        sof = get_sof_and_question(request.data.get("step_1_op"))
         data = {
-            "relevant_topics": input_relevant_topic,
+            "sof": sof,
         }
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -178,32 +182,31 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         (
-            full_legal_memo_original,
-            full_legal_memo_html,
-            legal,
-            facts,
-            analysis,
-            conclusion,
-        ) = step_2_output_formatter(request.data.get("counsel_output"))
+            research_analysis_text,
+            question_text,
+            decision,
+            intro_text,
+            conclusio_text,
+            brief_anwser,
+        ) = step_2_output_formatter_part2(request.data.get("counsel_output"))
         legal_memo_obj = self.get_object()
         if legal_memo_obj is None:
             return Response(
                 {"error": "BriefArgument not found"}, status=status.HTTP_404_NOT_FOUND
             )
         data = {
-            "legal": legal,
-            "facts": facts,
-            "full_legal_memo_original": full_legal_memo_original,
-            "full_legal_memo_html": full_legal_memo_html,
-            "conclusion": conclusion,
+            "question": question_text,
+            "decision_intro": intro_text,
+            "decision_conclusion": conclusio_text,
+            "brief_answer": brief_anwser,
         }
         serializer = self.get_serializer(legal_memo_obj, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        for anal in analysis:
+        for anal in decision:
             anal.update({"legal_memo": legal_memo_obj.id})
         Argument.objects.filter(legal_memo=legal_memo_obj).delete()
-        argument_serializer = ArgumentSerializer(data=analysis, many=True, partial=True)
+        argument_serializer = ArgumentSerializer(data=decision, many=True, partial=True)
         argument_serializer.is_valid(raise_exception=True)
         argument_serializer.save()
         self.get_success_headers(serializer.data)
@@ -211,6 +214,68 @@ class LegalMemorandumViewsets(viewsets.ModelViewSet):
             reverse(
                 "brief_argument:step_3",
                 kwargs={"legal_memo_id": serializer.data["id"]},
+            )
+        )
+
+    @action(detail=True, methods=["PUT"])
+    def step4(self, request, pk=None):
+        legal_memo_obj = self.get_object()
+        print("LEGAL::", legal_memo_obj)
+        if legal_memo_obj is None:
+            return Response(
+                {"error": "BriefArgument not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        conclusion = get_step4_output_formatter(request.data.get("conclusion_data"))
+        data = {
+            "conclusion": conclusion,
+        }
+        serializer = self.get_serializer(legal_memo_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return HttpResponseRedirect(
+            reverse(
+                "brief_argument:step_5",
+                kwargs={"legal_memo_id": serializer.data["id"]},
+            )
+        )
+
+    @action(detail=True, methods=["PUT"])
+    def step5(self, request, pk=None):
+        legal_memo_obj = self.get_object()
+        if legal_memo_obj is None:
+            return Response(
+                {"error": "BriefArgument not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        brief_answer, sof, conclusion, decision_value, full_legal_memo_original = (
+            legal_memo_formatter(request.data.get("memo_data"))
+        )
+        data = {
+            "full_legal_memo_html": full_legal_memo_original,
+            "brief_answer": brief_answer,
+            "sof": sof,
+            "conclusion": conclusion,
+        }
+        serializer = self.get_serializer(legal_memo_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        decision = Argument.objects.filter(legal_memo=legal_memo_obj)
+        # print("DECISION;::", decision)
+        for decision_val in decision_value:
+            for anal in decision:
+                print("ANAL TITLE::", anal)
+                print("DECISION::", decision_val["title"])
+                if anal.title == decision_val["title"]:
+                    anal.final_legal_text = decision_val["content"]
+                    anal.save()
+
+        # send mail (detailed legal_memo)
+        send_legal_memo_detail(legal_memo_obj)
+
+        legal_memo_obj.case_history.is_completed = True
+        legal_memo_obj.case_history.save()
+        return HttpResponseRedirect(
+            reverse(
+                "brief_argument:admin_home_page",
             )
         )
 
@@ -246,13 +311,6 @@ class StatementEmbeddingsViewsets(viewsets.ModelViewSet):
             CosineDistance("embeddings", embedding.data[0].embedding)
         ).values_list("husbury_file")
 
-        # final_result = (
-        #     RelevantCitationsPassage.objects.filter(
-        #         husbury_file__id__in=statement_result
-        #     )
-        #     .order_by(CosineDistance("embeddings", embedding.data[0].embedding))
-        #     .values("doc_name", "passage")
-        # )[:10]
         final_result = (
             RelevantCitationsPassage.objects.filter(
                 husbury_file__id__in=statement_result
@@ -340,7 +398,7 @@ class CaseViewsets(viewsets.ModelViewSet):
             selected_paragraphs = self.get_selected_parapgraphs(
                 case_note.case_query, case_note.embeddings
             )
-            case_paragraphs = self.get_all_case_paragraphs(case_note.case_query)
+            case_paragraphs = get_all_case_paragraphs(case_note.case_query)
             para_list = []
             selected_para_ids = set()
             para_list = [
@@ -387,7 +445,7 @@ class CaseViewsets(viewsets.ModelViewSet):
             del para["case_note_average_score"]
 
         return Response({"result": result}, status=status.HTTP_200_OK)
-    
+
     @action(detail=False, methods=["POST"])
     def case_search_1(self, request):
         openai.api_key = os.getenv("OPEN_AI")
@@ -513,3 +571,138 @@ class CaseViewsets(viewsets.ModelViewSet):
 
     def get_all_case_paragraphs(self, case):
         return case.paragraph.all()
+
+
+class CoCounselViewSets(viewsets.ModelViewSet):
+    queryset = CoCounsel.objects.all()
+    serializer_class = CoCounselSerializers
+
+    def create(self, request):
+        data = {
+            "legal_issue": request.data.get("legal_issue"),
+            "brief_facts": request.data.get("brief_facts"),
+            "case_facts": request.data.get("case_facts"),
+            "legal_research": request.data.get("legal_research"),
+        }
+        serializer = self.get_serializer(data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["GET"])
+    def get_cc_case(self, request):
+        try:
+            cc_case = (
+                self.get_queryset().filter(is_completed=False).latest("created_date")
+            )
+            input_1 = f"{cc_case.brief_facts} {cc_case.legal_issue}"
+            input_2 = f"{cc_case.case_facts}"
+            input_3 = f"{cc_case.legal_research}"
+            cc_case_id = f"{cc_case.id}"
+            return Response(
+                {
+                    "input_1": input_1,
+                    "input_2": input_2,
+                    "input_3": input_3,
+                    "cc_case_id": cc_case_id,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except CoCounsel.DoesNotExist:
+            return Response(
+                {
+                    "result": "All task complete. Please wait and reload after sometime for new task"
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    @action(detail=True, methods=["PUT"])
+    def step_1(self, request, pk=None):
+        cc_case_obj = self.get_object()
+        if cc_case_obj is None:
+            return Response(
+                {"error": "CoCounsel not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        research_analysis, search_query = get_research_and_query(
+            request.data.get("step_1_op")
+        )
+        data = {
+            "research_analysis": research_analysis,
+            "search_query": search_query,
+        }
+        serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return HttpResponseRedirect(
+            reverse(
+                "brief_argument:cc_worker_2",
+                kwargs={"cc_case_id": serializer.data["id"]},
+            )
+        )
+
+    @action(detail=True, methods=["GET"])
+    def get_step_2(self, request, pk=None):
+        cc_case_obj = self.get_object()
+        input_1 = f"{cc_case_obj.search_query}"
+        case_ids = get_top_cases(
+            cc_case_obj.research_analysis, cc_case_obj.search_query
+        )
+        input_list = self.get_selected_para(case_ids)
+        return Response(
+            {
+                "input_1": input_1,
+                "case_para_list": input_list,
+                "case_ids_list": case_ids,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["POST"])
+    def step_2_submit(self, request, pk=None):
+        cc_case_obj = self.get_object()
+        cocounsel_data = perplexity_scrape(request.data.get("link"))
+        data = {
+            "citations": cocounsel_data,
+            "case_ids_list": f"{request.data.get("case_ids_list")}",
+            "is_completed": True,
+        }
+        serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return HttpResponseRedirect(reverse("brief_argument:cc_worker_1"))
+
+    def get_selected_para(self, case_ids):
+        cases = Case.objects.filter(id__in=case_ids).prefetch_related(
+            Prefetch(
+                "case_note",
+                queryset=CaseNote.objects.all().prefetch_related(
+                    Prefetch(
+                        "paragraph",
+                        queryset=Caseparagraph.objects.all(),
+                        to_attr="case_note_para_query",
+                    ),
+                ),
+                to_attr="case_note_query",
+            )
+        )
+        input_list = []
+        for index, case in enumerate(cases, start=2):
+            case_note_para = set()
+            citation_paragraphs = set()
+            for case_note in case.case_note_query:
+                for para in case_note.case_note_para_query:
+                    case_note_para.add(para.para_count)
+            for item in case.citations:
+                if item["paragraph"] is not None:
+                    citation_paragraphs.update(item["paragraph"])
+            combined_set = list(case_note_para.union(citation_paragraphs))
+            paragraphs = (
+                Caseparagraph.objects.filter(case=case, para_count__in=combined_set)
+                .order_by("para_count")
+                .values_list("text", flat=True)
+            )
+            paragraph_text = ".".join(paragraphs)
+            input_list.append({f"input_{index}": paragraph_text})
+
+        return input_list

@@ -11,6 +11,7 @@ class CaseHistory(models.Model):
     fact_case = models.TextField(verbose_name=_("Fact of the Case"), null=True, blank=True)
     legal_research = models.TextField(verbose_name=_("Legal Research"), null=True, blank=True)
     legal_memo = models.OneToOneField(Legal_Memorandum, null=True, blank=True, on_delete=models.CASCADE, related_name="case_history")
+    unique_id = models.IntegerField(null=True, blank=True)
     is_completed = models.BooleanField("Is the email sent", default=False, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)

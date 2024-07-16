@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Include the Quill library -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <title>Step 1</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <h1>Step 1</h1>
+        <label for="input_1">Input 1:</label>
+        <input type="text" id="input_1" name="input_1" v-model="caseDetail.input_1" ref="input_1" readonly>
+        <button @click="copyText('input_1')">Copy</button>
+        <br>
+        <br>
+        <label for="input_2">Input 2:</label>
+        <input type="text" id="input_2" name="input_2" v-model="caseDetail.input_2" ref="input_2" readonly>
+        <button @click="copyText('input_2')">Copy</button>
+        <br>
+        <br>
+        <label for="input_3">Input 3:</label>
+        <input type="text" id="input_3" name="input_3" v-model="caseDetail.input_3" ref="input_3" readonly>
+        <button @click="copyText('input_3')">Copy</button>
+        <br>
+        <br>
+        <br>
+        <label for="output_value">OUTPUT</label>
+        <textarea id="output_value" name="output_value" v-model="output_value"
+            style="height: 100px; width: 300px;"></textarea>
+        <br>
+        <input type="submit" value="Submit" @click="pasteAndSubmit">
+    </div>
+</body>
+<script>
+    const { createApp, ref, onMounted, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+    const app = createApp({
+        setup() {
+            const url = window.location.href;
+            // const uuid = window.location.href.split('/');
+            const output_value = ref('');
+            const caseDetail = ref({
+                input_1: '',
+                input_2: '',
+                input_3: '',
+                cc_case_id: '',
+            });
+            const input_1 = ref(null);
+            const input_2 = ref(null);
+            const input_3 = ref(null);
+
+
+            onMounted(() => {
+                window.scrollTo(0, 0);
+                get_data();
+            });
+
+            const copyText = (value) => {
+                const inputField = document.getElementById(value);
+                switch (value) {
+                    case 'input_1':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_2':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_3':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    default:
+                        console.log('Invalid value');
+                }
+            };
+            const get_data = () => {
+                axios.get('/api/cocounsel/get_cc_case/').then(response => {
+                    caseDetail.value.input_1 = response.data["input_1"];
+                    caseDetail.value.input_2 = response.data["input_2"];
+                    caseDetail.value.input_3 = response.data["input_3"];
+                    caseDetail.value.cc_case_id = response.data["cc_case_id"];
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+            const pasteAndSubmit = () => {
+                axios.put('/api/cocounsel/' + caseDetail.value.cc_case_id + "/step_1/", {
+                    step_1_op: output_value.value,
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    if (response.status === 200) {
+                        window.location.href = response.request.responseURL;
+                    }
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+
+            return {
+                copyText,
+                get_data,
+                pasteAndSubmit,
+                output_value,
+                caseDetail,
+
+            };
+        },
+    })
+    app.config.compilerOptions.delimiters = ["[[", "]]"];
+    app.mount('#app')
+</script>
+
+
+</html>

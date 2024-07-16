@@ -1,6 +1,11 @@
 import re
+import os
 import json
 import openai
+from django.db.models import Func, Value, FloatField, Count, Max, TextField, Prefetch
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import Q
+from django.db.models.functions import Cast
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import get_token
 from django.utils.safestring import mark_safe
@@ -16,11 +21,15 @@ from pgvector.django import CosineDistance
 from brief_argument.scraper2 import run_playwright
 from .models import (
     Argument,
+    Case,
+    CaseNote,
+    Caseparagraph,
     Legal_Memorandum,
     AIB_EXAM,
     HulsburyLawBooks,
     StatementEmbeddings,
     RelevantCitationsPassage,
+    CoCounsel,
 )
 from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
@@ -33,26 +42,24 @@ from .serializers import (
     RelevantCitationsPassageSerializer,
 )
 from .utils import (
-    INPUT_TOPICS,
-    del_duplicates,
-    get_step_1_input,
-    get_step_2_input_with_lr,
-    get_step_2_input_without_lr,
+    decision_value,
+    get_case_notes_and_ratio_para,
+    get_step_1_input_part2,
+    get_step_2_input_part2,
     get_step_3_input_with_lr,
     get_step_3_input_without_lr,
-    import_air,
-    keyword_and_embedding,
-    open_ai_keyword_api,
-    para_embedd,
-    read_word_doc,
+    get_step_4_input_part2,
+    get_step_5_input_part2,
+    get_top_cases,
+    perplexity_scrape,
     send_legal_memo_detail,
     aib_exam__step_1_input,
     aib_exam_step_2_input,
     relevent_topics_input_generator,
     send_aib_mail,
+    step2_setup,
     step_2_output_formatter,
-    law_topics_format_generator,
-    update_the_citation,
+    step_3_input_part2,
 )
 
 
@@ -311,9 +318,6 @@ def main_page(request):
     #         case.text = case.text.replace(f"{match.group(0)}.",'')
     #         id_list.append(case)
     #         case.save()
-    #         index += 1
-    #         print("Para::",index)
-    #     except:
     #         print("not working")
     #         print('not working TEXT::', case.text)
     #         print("not working PARA:::", case.para_count)
@@ -322,7 +326,18 @@ def main_page(request):
     # print("::::::: Case Paragraphs BUlk Update ::::::")
     # # Caseparagraph.objects.bulk_update(id_list, ['text', 'para_count'])
     # print("::::::: Case Paragraph Done::::::")
+    # step2_setup()
+    print("EMPTY CASE PARA:::",Case.objects.filter(paragraph__isnull=True).count())
+    # get_top_cases("This is the text of task 1", "This is the query text")
+    # print(CaseNote.objects.filter(case__id='4def5390-17ed-4f91-a456-a0c62a857c4e').values_list("short_text", flat=True))
+    # case_notes = (
+    #     CaseNote.objects.all()
+    #     .values("id", "short_text")[:3]
+    # )
+    # dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
 
+    # print("CASES::", [doc for doc in case_notes])
+    # perplexity_scrape("https://www.perplexity.ai/page/session-of-the-flat-An8Ly5R5Tj.IsN3A.ZWxAA")
     csrf_token = get_token(request)
     return render(request, "brief_argument/main_page.html", {"csrf_token": csrf_token})
 
@@ -330,8 +345,9 @@ def main_page(request):
 def step_1(request, case_id):
     csrf_token = get_token(request)
     case_history = CaseHistory.objects.get(id=case_id)
-    system_instruction = get_step_1_input(
-        INPUT_TOPICS, case_history.fact_case, case_history.legal_issue
+    system_instruction = get_step_1_input_part2(
+        case_history.legal_issue,
+        case_history.fact_case,
     )
     context = {
         "research_input": system_instruction,
@@ -342,20 +358,44 @@ def step_1(request, case_id):
 
 def step_2(request, legal_memo_id):
     legal_memo = Legal_Memorandum.objects.get(id=legal_memo_id)
+    sof = legal_memo.sof
+    legal_issue = legal_memo.case_history.legal_issue
+    sof = sof.replace("<p>", "")
+    sof = sof.replace("</p>", "")
+    sof = sof.replace("<br>", "")
+    sof = sof.replace("Statement of Facts", "")
+    openai.api_key = os.getenv("OPEN_AI")
+    sof_embeddings = openai.embeddings.create(
+        input=[f"{legal_issue}{sof}{legal_issue}"], model="text-embedding-3-large"
+    )
+    case_notes = (
+        CaseNote.objects.annotate(
+            case_note_score=CosineDistance(
+                "embeddings", sof_embeddings.data[0].embedding
+            )
+        )
+        .order_by("case_note_score")[:50]
+        .prefetch_related(
+            Prefetch(
+                "paragraph",
+                queryset=Caseparagraph.objects.annotate(
+                    para_score=CosineDistance(
+                        "embeddings", sof_embeddings.data[0].embedding
+                    ),
+                ),
+                to_attr="paragraph_value",
+            ),
+        )
+    )
     csrf_token = get_token(request)
-    if legal_memo.case_history.legal_research:
-        system_instruction = get_step_2_input_with_lr(
-            relevent_topics=legal_memo.relevant_topics,
-            facts=legal_memo.case_history.fact_case,
-            legal=legal_memo.case_history.legal_issue,
-            research=legal_memo.case_history.legal_research,
-        )
-    else:
-        system_instruction = get_step_2_input_without_lr(
-            relevent_topics=legal_memo.relevant_topics,
-            facts=legal_memo.case_history.fact_case,
-            legal=legal_memo.case_history.legal_issue,
-        )
+
+    system_instruction = get_step_2_input_part2(
+        facts=legal_memo.case_history.fact_case,
+        legal_issue=legal_memo.case_history.legal_issue,
+        sof=sof,
+        case=get_case_notes_and_ratio_para(case_notes),
+    )
+    # print("SYStem ::", system_instruction)
     context = {
         "csrf_token": csrf_token,
         "input_1": system_instruction,
@@ -372,40 +412,31 @@ def step_3(request, legal_memo_id):
     )
     facts = legal_memo.case_history.fact_case
     legal = legal_memo.case_history.legal_issue
-    relevent_topics = legal_memo.relevant_topics
-    legal_memo_original = legal_memo.full_legal_memo_original
+    sof = legal_memo.sof
+    brief_answer = legal_memo.brief_answer
+    intro = legal_memo.decision_intro
     total_input = []
-    is_legal_research_present = bool(legal_memo.case_history.legal_research)
+    all_discussion = ""
     for anal in legal_memo.analysis.all():
-        if is_legal_research_present:
-            total_input.append(
-                {
-                    "ids": anal.id,
-                    "input": get_step_3_input_with_lr(
-                        legal_memo_original,
-                        relevent_topics,
-                        facts,
-                        legal,
-                        anal.title,
-                        anal.content,
-                        legal_memo.case_history.legal_research,
-                    ),
-                }
-            )
-        else:
-            total_input.append(
-                {
-                    "ids": anal.id,
-                    "input": get_step_3_input_without_lr(
-                        legal_memo_original,
-                        relevent_topics,
-                        facts,
-                        legal,
-                        anal.title,
-                        anal.content,
-                    ),
-                }
-            )
+        all_discussion += f"<{anal.title}>{anal.content}</{anal.title}>"
+    for anal in legal_memo.analysis.all():
+        total_input.append(
+            {
+                "ids": anal.id,
+                "input": step_3_input_part2(
+                    facts,
+                    legal,
+                    anal.title,
+                    intro,
+                    anal.content,
+                    sof,
+                    legal_memo.question,
+                    brief_answer,
+                    all_discussion,
+                    decision_value(anal.title, anal.content, sof),
+                ),
+            }
+        )
     step_3_input_json = json.dumps(total_input)
     csrf_token = get_token(request)
     context = {
@@ -415,6 +446,103 @@ def step_3(request, legal_memo_id):
         "step_3_input_json": step_3_input_json,
     }
     return render(request, "brief_argument/step_3.html", context)
+
+
+def step_4(request, legal_memo_id):
+    legal_memo = (
+        Legal_Memorandum.objects.filter(id=legal_memo_id)
+        .prefetch_related("analysis", "case_history")
+        .first()
+    )
+    facts = legal_memo.case_history.fact_case
+    legal_issue = legal_memo.case_history.legal_issue
+    sof = legal_memo.sof
+    sof = sof.replace("<p>", "")
+    sof = sof.replace("</p>", "")
+    sof = sof.replace("<br>", "")
+    sof = sof.replace("Statement of Facts", "")
+    brief_answer = legal_memo.brief_answer
+    brief_answer.replace("<p>", "")
+    brief_answer.replace("</p>", "")
+    brief_answer.replace("<br>", "")
+    question = legal_memo.question
+    question = question.replace("<p>", "")
+    question = question.replace("</p>", "")
+    decision_intro = legal_memo.decision_intro
+    decision_intro = decision_intro.replace("<p>", "")
+    decision_intro = decision_intro.replace("</p>", "")
+    decision_text = ""
+    for anal in legal_memo.analysis.all():
+        content = anal.detailed_content
+        content = content.replace("<p>", "")
+        content = content.replace("</p>", "")
+        content = content.replace("<br>", "")
+        title = anal.title
+        title = title.replace("<p>", "")
+        title = title.replace("</p>", "")
+        title = title.replace("<br>", "")
+        decision_text += f"""<{title}> {content} </{title}> """
+    step_4_input = get_step_4_input_part2(
+        facts, legal_issue, question, sof, brief_answer, decision_intro, decision_text
+    )
+    csrf_token = get_token(request)
+    context = {
+        "csrf_token": csrf_token,
+        "step_4_input": step_4_input,
+    }
+    return render(request, "brief_argument/step_4.html", context)
+
+
+def step_5(request, legal_memo_id):
+    legal_memo = (
+        Legal_Memorandum.objects.filter(id=legal_memo_id)
+        .prefetch_related("analysis", "case_history")
+        .first()
+    )
+    sof = legal_memo.sof
+    sof = sof.replace("<p>", "")
+    sof = sof.replace("</p>", "")
+    sof = sof.replace("<br>", "")
+    sof = sof.replace("Statement of Facts", "")
+    brief_answer = legal_memo.brief_answer
+    brief_answer = brief_answer.replace("<p>", "")
+    brief_answer = brief_answer.replace("</p>", "")
+    brief_answer = brief_answer.replace("<br>", "")
+    question = legal_memo.question
+    question = question.replace("<p>", "")
+    question = question.replace("</p>", "")
+    decision_intro = legal_memo.decision_intro
+    decision_intro = decision_intro.replace("<p>", "")
+    decision_intro = decision_intro.replace("</p>", "")
+    decision_conclusion = legal_memo.decision_conclusion
+    decision_conclusion = decision_conclusion.replace("<p>", "")
+    decision_conclusion = decision_conclusion.replace("</p>", "")
+    conclusion = legal_memo.conclusion
+    conclusion = conclusion.replace("<p>", "")
+    conclusion = conclusion.replace("</p>", "")
+    decision_text = ""
+    index = 1
+    for anal in legal_memo.analysis.all():
+        content = anal.detailed_content
+        content = content.replace("<p>", "")
+        content = content.replace("</p>", "")
+        content = content.replace("<br>", "")
+        title = anal.title
+        title = title.replace("<p>", "")
+        title = title.replace("</p>", "")
+        title = title.replace("<br>", "")
+        decision_text += f"""<{title}> {content} </{title}> """
+        # decision_text += f"""<subsection_{index}><{title}> {content} </{title}></subsection_{index}>"""
+        index += 1
+    step_5_input = get_step_5_input_part2(
+        question, sof, brief_answer, decision_text, conclusion
+    )
+    csrf_token = get_token(request)
+    context = {
+        "csrf_token": csrf_token,
+        "step_5_input": step_5_input,
+    }
+    return render(request, "brief_argument/step_5.html", context)
 
 
 def admin_home_page(request):
@@ -522,3 +650,18 @@ def legal_search(request):
         "csrf_token": csrf_token,
     }
     return render(request, "brief_argument/legal_search_2.html", context)
+
+
+def cocounsel_worker_1(request):
+    csrf_token = get_token(request)
+    context = {
+        "csrf_token": csrf_token,
+    }
+    return render(request, "brief_argument/cc_worker_1.html", context)
+
+def cocounsel_worker_2(request, cc_case_id):
+    csrf_token = get_token(request)
+    context = {
+        "csrf_token": csrf_token,
+    }
+    return render(request, "brief_argument/cc_worker_2.html", context)

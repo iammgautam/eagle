@@ -3,29 +3,27 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width='device-width', initial-scale=1.0">
     <!-- Include the Quill library -->
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
-    <title>Step 1</title>
+    <title>Step 5</title>
 </head>
 
 <body>
     <div id="app">
-        <h1>Step 1</h1>
-        <label for="research_input">Input 1:</label>
-        <input type="text" id="research_input" name="research_input" value="{{ research_input }}" ref="research_input"
-            readonly>
-        <button @click="copyText('research_input')">Copy</button>
+        <h1>Step 5</h1>
+        <label for="step_5_input">INPUT:</label>
+        <input type="text" id="step_5_input" name="step_5_input" value="{{ step_5_input }}" ref="step_5_input" readonly>
+        <button @click="copyText('step_5_input')">Copy</button>
         <br>
         <br>
         <br>
-        <label for="reseach_output">OUTPUT</label>
-        <input type="text" id="reseach_output" name="reseach_output" v-model="reseachOutput">
+        <label for="counsel_output_2">OUTPUT</label>
         <br>
         <input type="submit" value="Submit" @click="pasteAndSubmit">
-    <!-- </div>
+    </div>
     <div id="editor">
-    </div> -->
+    </div>
 </body>
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
@@ -33,31 +31,30 @@
 <script>
     const { createApp, ref, toRefs } = Vue;
     const csrftoken = '{{ csrf_token }}';
-    // const quill = new Quill('#editor', {
-    //     theme: 'snow'
-    // });
+    const quill = new Quill('#editor', {
+        theme: 'snow'
+    });
     createApp({
         setup() {
             const url = window.location.href;
             const uuid = window.location.href.split('/');
-            const research_input = ref(null);
-            const reseachOutput = ref('');
+            const step_5_input = ref(null);
+            const counsel_output_2 = ref('');
             const copyText = (value) => {
                 switch (value) {
-                    case 'research_input':
-                        research_input.value.select();
+                    case 'step_5_input':
+                        step_5_input.value.select();
                         document.execCommand('copy');
                         break;
                     default:
                         console.log('Invalid value');
                 }
             };
-            const pasteAndSubmit = () => {
-                // const textarea = document.getElementById('reseach_output');
-                // var html = quill.root.innerHTML;
-                axios.post('/api/legal_memo/', {
-                    step_1_op: reseachOutput.value,
-                    case_id: uuid[4],
+            const pasteAndSubmit = async () => {
+                var html = quill.root.innerHTML;
+                axios.put('/api/legal_memo/' + uuid[4] + "/step5/", {
+                    memo_data: html,
+                    brief_id: uuid[4],
                 }, {
                     headers: {
                         'X-CSRFToken': csrftoken
@@ -70,14 +67,13 @@
                     console.error(error);
                 });
             };
-
             return {
                 ...toRefs({
                     copyText,
                     pasteAndSubmit,
                 }),
-                reseachOutput,
-                research_input,
+                step_5_input,
+                counsel_output_2,
             };
         },
     }).mount('#app');

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Include the Quill library -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <title>Step 2</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div v-if="show_data">
+            <h1>Step 2</h1>
+            <label for="input_1">Input 1:</label>
+            <input type="text" id="input_1" name="input_1" v-model="input_1_value" ref="input_1" readonly>
+            <button @click="copyText('input_1')">Copy</button>
+            <br>
+            <br>
+            <div v-for="(item, index) in case_para_list" :key="index">
+                <label :for="'input_' + (index + 2)">Input [[ index + 2 ]]:</label>
+                <input :type="'text'" :id="'input_' + (index + 2)" :name="'input_' + (index + 2)"
+                    v-model="item[Object.keys(item)[0]]" :ref="'input_' + (index + 2)" readonly>
+                <button @click="copyText('input_' + (index + 2))">Copy</button>
+                <br><br>
+            </div>
+            <br>
+            <br>
+            <br>
+            <label for="output_value">OUTPUT</label>
+            <textarea id="output_value" name="output_value" v-model="output_value"
+                style="height: 100px; width: 300px;"></textarea>
+            <br>
+            <input type="submit" value="Submit" @click="pasteAndSubmit">
+        </div>
+    </div>
+</body>
+<script>
+    const { createApp, ref, onMounted, toRefs } = Vue;
+    const csrftoken = '{{ csrf_token }}';
+    const app = createApp({
+        setup() {
+            const uuid = window.location.href.split('/');
+            const output_value = ref('');
+            const input_1_value = ref('');
+            const case_para_list = ref([]);
+            const case_ids_list = ref([]);
+            const input_1 = ref(null);
+            const input_2 = ref(null);
+            const input_3 = ref(null);
+            const show_data = ref(false);
+
+
+            onMounted(() => {
+                window.scrollTo(0, 0);
+                get_data();
+            });
+
+            const copyText = (value) => {
+                const inputField = document.getElementById(value);
+                switch (value) {
+                    case 'input_1':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_2':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_3':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_4':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'input_5':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    default:
+                        console.log('Invalid value');
+                }
+            };
+            const get_data = () => {
+                axios.get('/api/cocounsel/' + uuid[4] + "/get_step_2/").then(response => {
+                    input_1_value.value = response.data["input_1"];
+                    case_para_list.value = response.data["case_para_list"];
+                    case_ids_list.value = response.data["case_ids_list"];
+                    show_data.value = true;
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+            const pasteAndSubmit = () => {
+                axios.post('/api/cocounsel/' + uuid[4] + '/step_2_submit/', {
+                    link: output_value.value,
+                    case_ids_list: case_ids_list.value,
+                }, {
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                }).then(response => {
+                    if (response.status === 200) {
+                        window.location.href = response.request.responseURL;
+                    }
+                }).catch(error => {
+                    console.error(error);
+                });
+            };
+
+            return {
+                copyText,
+                get_data,
+                pasteAndSubmit,
+                output_value,
+                show_data,
+                input_1_value,
+                case_para_list,
+                case_ids_list,
+                input_1,
+                input_2,
+                input_3,
+
+            };
+        },
+    })
+    app.config.compilerOptions.delimiters = ["[[", "]]"];
+    app.mount('#app')
+</script>
+
+
+</html>

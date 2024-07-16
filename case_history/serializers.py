@@ -11,6 +11,7 @@ class CaseHistorySerializer(serializers.ModelSerializer):
             "legal_issue",
             "fact_case",
             "legal_memo",
+            "unique_id",
             "is_completed",
             "legal_research",
             "created_date",

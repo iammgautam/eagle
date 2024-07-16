@@ -4110,6 +4110,12 @@ class Legal_Memorandum(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     legal = models.TextField(null=True, blank=True)
     facts = models.TextField(null=True, blank=True)
+    sof = models.TextField(null=True, blank=True)
+    brief_answer = models.TextField(null=True, blank=True)
+    decision_intro = models.TextField(null=True, blank=True)
+    decision_conclusion = models.TextField(null=True, blank=True)
+    question = models.TextField(null=True, blank=True)
+    brief_answer = models.TextField(null=True, blank=True)
     conclusion = models.TextField(null=True, blank=True)
     relevant_topics = models.TextField(null=True, blank=True)
     full_legal_memo_original = models.TextField(null=True, blank=True)
@@ -4122,6 +4128,8 @@ class Argument(models.Model):
     title = models.TextField(null=True, blank=True)
     content = models.TextField(null=True, blank=True)
     detailed_content = models.TextField(null=True, blank=True)
+    final_legal_text = models.TextField(null=True, blank=True)
+    index = models.IntegerField(null=True, blank=True)
     legal_memo = models.ForeignKey(
         Legal_Memorandum,
         on_delete=models.CASCADE,
@@ -4194,9 +4202,14 @@ class Case(models.Model):
     petitioner = models.CharField(null=True, blank=True)
     respondent = models.CharField(null=True, blank=True)
     citations = models.JSONField(default=dict, blank=True)
+    case_references = models.ManyToManyField(
+        "self", symmetrical=False, related_name="referring_cases", blank=True
+    )
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f'{self.code}'
 
 class Caseparagraph(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -4229,5 +4242,19 @@ class caseNotesKeyword(models.Model):
     )
     keyword = models.CharField(null=True, blank=True)
     embedding = VectorField(dimensions=3072, default=default_embeddings)
+    created_date = models.DateTimeField(auto_now_add=True)
+    modified_date = models.DateTimeField(auto_now=True)
+
+class CoCounsel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    legal_issue = models.TextField(verbose_name=_("Legal Issue"), null=True, blank=True)
+    brief_facts = models.TextField(verbose_name=_("Brief Facts"), null=True, blank=True)
+    case_facts = models.TextField(verbose_name=_("Case Facts"), null=True, blank=True)
+    legal_research = models.TextField(verbose_name=_("Legal Research"), null=True, blank=True)
+    research_analysis = models.TextField(verbose_name=_("Research Analysis"), null=True, blank=True)
+    search_query = models.TextField(verbose_name=_("Search Query"), null=True, blank=True)
+    is_completed = models.BooleanField("Completed", default=False, blank=True)
+    citations = models.JSONField(default=dict, blank=True)
+    case_ids_list = models.TextField(verbose_name=_("Case Ids"), null=True, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)

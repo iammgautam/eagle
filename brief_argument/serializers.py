@@ -9,6 +9,7 @@ from .models import (
     Case,
     CaseNote,
     Caseparagraph,
+    CoCounsel,
 )
 
 
@@ -49,6 +50,11 @@ class LegalMemorandumSerializer(serializers.ModelSerializer):
             "id",
             "legal",
             "facts",
+            "sof",
+            "brief_answer",
+            "question",
+            "decision_intro",
+            "decision_conclusion",
             "conclusion",
             "relevant_topics",
             "full_legal_memo_original",
@@ -207,14 +213,35 @@ class LegalResearchStep1Serializer(serializers.ModelSerializer):
             "paragraph_value",
         ]
 
+
 class CaseParagraphSerializerValue(serializers.ModelSerializer):
     class Meta:
         model = Caseparagraph
-        fields = ('id', 'text')
+        fields = ("id", "text")
+
 
 class CaseSerializerValue(serializers.ModelSerializer):
     paragraph = CaseParagraphSerializerValue(many=True, read_only=True)
 
     class Meta:
         model = Case
-        fields = ('id', 'court', 'judges', 'petitioner', 'respondent', 'paragraph')
+        fields = ("id", "court", "judges", "petitioner", "respondent", "paragraph")
+
+
+class CoCounselSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = CoCounsel
+        fields = (
+            "id",
+            "legal_issue",
+            "brief_facts",
+            "case_facts",
+            "legal_research",
+            "research_analysis",
+            "search_query",
+            "is_completed",
+            "citations",
+            "case_ids_list",
+            "created_date",
+            "modified_date",
+        )

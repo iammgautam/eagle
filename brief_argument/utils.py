@@ -1,14 +1,19 @@
 import re
 import docx
 import ast
+import functools
+import operator
+import cohere
 import os
+from playwright.sync_api import sync_playwright
+from pgvector.django import CosineDistance
 from brief_argument.models import default_embeddings
 import openai
 from openai import OpenAI
-import google.generativeai as genai
 import lxml.etree
 from django.template.loader import render_to_string
-from django.db.models import Q, Prefetch
+from django.db.models.functions import Cast
+from django.db.models import Q, Prefetch, Count, FloatField, F
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
 from brief_argument.scraper2 import run_playwright
@@ -21,6 +26,7 @@ from brief_argument.models import (
     Caseparagraph,
 )
 from legal_gpt import settings
+
 INPUT_TOPICS = """Law 1 Constitutional Law:
     Topic 1.01 Constitution and Constitutionalism Size:14102,
     Topic 1.02 Nature of Indian Constitution and Concept of Federalism Size:20192,
@@ -231,6 +237,40 @@ INPUT_TOPICS = """Law 1 Constitutional Law:
 
 def get_step_1_input(topics, facts, legal_issue):
     return f"""You are a legal researcher tasked with finding the most relevant and applicable law topics for a particular legal case. To assist you, I will provide three key pieces of information: <allLawTopics> {topics}</allLawTopics> <facts>{facts} </facts><legalIssue>{legal_issue}</legalIssue>Please follow these steps carefully:1. Read the facts of the case and the legal issue thoroughly to fully understand the details and context of the case.2. Review the provided list of law topics, paying close attention to how they are segmented and described. Make sure you have a clear grasp of what each topic entails.3. Select the law topics that are most relevant and applicable to the case at hand, based on your analysis of the facts and the legal issue that needs to be addressed.4. Check the cumulative size of your selected law topics. If the total size exceeds 100000, carefully deselect the least relevant and applicable topics from your list until the cumulative size is reduced to 125000 or below.5. Provide your final curated list of the most relevant and applicable law topics for this case inside <selected_law_topics> tags, formatted as follows:<selected_law_topics>[list the relevant and applicable law topics here]</selected_law_topics>Remember, your goal is to identify the law topics that are most pertinent and useful for addressing the legal issue, given the specific facts of the case. Carefully consider the relevance and applicability of each topic before making your final selections.  Strictly give response as per the given sample response format Sample Response Format:            <selected_law_topics>            Topic 1.02: "Topic_1.02_name"-"topic_1.02_size"           Topic 1.04: "Topic_1.04_name"-"topic_1.04_size"           Topic 9.03: "Topic_9.03_name"-"topic_9.03_size"             Total size: topic_1.02_size + topic_1.04_size + topic_9.03_size            </selected_law_topics>"""
+
+
+def get_step_1_input_part2(legal_issue, facts):
+    return f"""You are a skilled legal researcher tasked with drafting the Statement of Facts section of a legal memorandum. Follow these instructions carefully to complete your task:
+
+        1. Review the legal issue provided:
+        <legal_issue>
+        {legal_issue}
+        </legal_issue>
+
+        2. Carefully read and analyze the facts of the case:
+        <facts>
+        {facts}
+        </facts>
+
+        3. Draft the Statement of Facts section, following these guidelines:
+        a. Present a concise, impartial summary of the key facts provided in the facts section.
+        b. Organize the facts either chronologically or thematically, whichever best clarifies the situation.
+        c. Include only relevant facts that are directly related to the legal issue.
+        d. Mention any current and past legal proceedings related to the issue.
+        e. Avoid including any legal analysis or arguments in this section.
+
+        4. Formatting and Style:
+        a. Use clear, concise language appropriate for a legally sophisticated audience.
+        b. Employ an active voice and avoid ambiguities or redundancies.
+        c. Use headings and subheadings to enhance readability, if necessary.
+        d. Ensure each paragraph focuses on a specific aspect of the case or a distinct set of related facts.
+        e. Use proper legal citation format for any cases, statutes, or other legal authorities mentioned.
+
+        5. Before drafting your final Statement of Facts, use the <scratchpad> tags to outline the key points and organize your thoughts. This will help ensure a logical and coherent presentation of the facts.
+
+        6. Present your completed Statement of Facts within <statement_of_facts> tags.
+
+        Remember, your goal is to provide an objective and comprehensive summary of the relevant facts, laying the groundwork for the legal analysis that will follow in subsequent sections of the memorandum."""
 
 
 def get_step_2_input_with_lr(relevent_topics, facts, legal, research):
@@ -863,61 +903,6 @@ def read_word_doc(tag, directory):
     return data
 
 
-def update_the_citation():
-    law_obj = HulsburyLawBooks.objects.get(id=530)
-
-    genai.configure(api_key="AIzaSyCvsOGdpu4Ke0E-m90nCSUV2M5LGv5GEwA")
-    # Create the model
-    # See https://ai.google.dev/api/python/google/generativeai/GenerativeModel
-    generation_config = {
-        "temperature": 0.9,
-        "top_p": 1,
-        "top_k": 0,
-        "max_output_tokens": 8192,
-        "response_mime_type": "text/plain",
-    }
-    print("Available base models:", [m.name for m in genai.list_models()])
-
-    model = genai.GenerativeModel(
-        model_name="tunedModels/w2ndfinetuneprompt-ydb1zhmc9pmn",
-        generation_config=generation_config,
-        # safety_settings = Adjust safety settings
-        # See https://ai.google.dev/gemini-api/docs/safety-settings
-    )
-    # for law_single_obj in law_obj.first():
-    # legal_text = ''.join(law_obj.citation_list)
-    # print("Citations::", legal_text, type(legal_text))
-    response = model.generate_content(law_obj.citation_list)
-
-    print(response.text)
-    # response = model.generate_content([
-    # "input: 1 the Assam Rhinoceros Protection Act 1954 s 2. Every rhinoceros captured and the horn or carcass or any\npart of every rhinoceros killed in contravention of the Act will be the property of the state government: Assam\nRhinoceros Protection Act 1954 s 3.\n\n2 The\nWild Life (Protection) Act 1972 has six schedules. Schedules 1, 2, 3, 4 contain a list of endangered\nfauna, mammals, amphibians, reptiles, birds, crustaceans and insects, Sch 5 contains a list of vermin and Sch 6\ncontains a list of endangered flora.\n\n3\nWild Life (Protection) Act 1972 ss 40, 41, 42. Every person who, at the commencement of the Act, was\nin possession of any uncured trophy derived from a Sch 1 or Sch 2 Pt I wild animal, or salted or dried skin of such\nanimal, or the musk of a musk deer, or the horn of a rhinoceros, was required to declare the same to the Chief Wild Life\nWarden within 30 days:\nWild Life (Protection) Act 1972 s 40 (1). The Chief Wild Life Warden would make enquiries, and if\nsatisfied, affix on the article, trophy or uncured trophy, identification marks and issue a certificate of ownership:\nWild Life (Protection) Act 1972 s 41 (1) (b), (c).\n\n4\nWild Life (Protection) Act 1972 s 40 (3).\n\n5\nWild Life (Protection) Act 1972 s 43 (2).\n\nPage 2 of\n\n[15.009] Property in wild animals under the Wild Life (Protection) Act 1972\n\n6\nWild Life (Protection) Act 1972 s 43 (1), (3), (4). Prior to the granting of permission, the Chief Wild Life\nWarden has to ascertain that the animal referred to in the certificate of ownership has been lawfully acquired:\nWild Life (Protection) Act 1972 s 43 (4).",
-    # "output: ",
-    # ])
-
-    # print(response.text)
-
-    # gemini code
-    # output = {
-    #     "statutes": {
-    #         # "Assam Rhinoceros Protection Act 1954 s 2",
-    #         # "Assam Rhinoceros Protection Act 1954 s 3",
-    #         "Wild Life (Protection) Act 1972",
-    #         # "Wild Life (Protection) Act 1972 s 42",
-    #         # "Wild Life (Protection) Act 1972 s 41",
-    #         # "Wild Life (Protection) Act 1972 s 40",
-    #         # "Wild Life (Protection) Act 1972 s 43",
-    #     },
-    #     "case laws": {},
-    #     "files": {},
-    # }
-    # statutes = list(output["statutes"])
-    # case_laws = list(output["case laws"])
-    # files = list(output["files"])
-
-    # return final_function(case_laws, statutes, law_obj.book_id, law_obj)
-
-
 def import_air():
 
     # Set your OpenAI API key
@@ -1032,7 +1017,7 @@ def para_embedd():
                 )
                 para.embeddings = embedding.data[0].embedding
                 para.save()
-                index = index +1
+                index = index + 1
             except Exception as e:
                 truncate_text = get_first_4000_words(para.text)
                 print(para.id)
@@ -1043,7 +1028,7 @@ def para_embedd():
                 )
                 para.embeddings = embedding.data[0].embedding
                 para.save()
-                index = index +1
+                index = index + 1
     return True
 
 
@@ -1113,5 +1098,740 @@ def del_duplicates():
 def get_first_4000_words(text):
     words = text.split()
     first_4000 = words[:4000]
-    result = ' '.join(first_4000)
+    result = " ".join(first_4000)
     return result
+
+
+def get_selected_parapgraphs(case, query_embedding):
+    case_note_para = set()
+    citation_paragraphs = set()
+    for case_note in case.case_notes_query:
+        for para in case_note.paragraph.all():
+            case_note_para.add(para.para_count)
+    for item in case.citations:
+        if item["paragraph"] is not None:
+            citation_paragraphs.update(item["paragraph"])
+    combined_set = list(case_note_para.union(citation_paragraphs))
+    return (
+        Caseparagraph.objects.filter(
+            para_count__in=combined_set,
+            case=case,
+        )
+        .annotate(selected_para_score=CosineDistance("embeddings", query_embedding))
+        .order_by("selected_para_score")
+    )
+
+
+def get_all_case_paragraphs(case):
+    return case.paragraph.all()
+
+
+def get_sof_and_question(value):
+    print("VALIUESS::", value)
+    # print(value)
+    sof_start = "&lt;statement_of_facts&gt;"
+    sof_end = "&lt;/statement_of_facts&gt;"
+
+    pattern = f"{sof_start}(.*?){sof_end}"
+
+    match = re.search(pattern, value, re.DOTALL)
+
+    if match:
+        extracted_text = match.group(1)
+        # print(extracted_text)
+        return extracted_text
+
+
+def get_step_2_input_part2(facts, legal_issue, sof, case):
+    return f"""You are a skilled legal researcher tasked with drafting key sections of a legal memorandum. Follow these instructions carefully to complete your task:
+
+        1. Review the legal issue provided:
+        <legal_issue>
+        {legal_issue}
+        </legal_issue>
+
+        2. Carefully read and analyze the facts of the case:
+        <case_facts>
+        {facts}
+        </case_facts>
+
+        3. Review the statement of facts section of the legal memorandum that has already been drafted:
+        <legal_memorandum>
+
+        <statement_of_facts>
+
+        {sof}
+
+        </statement_of_facts>
+
+        </legal_memorandum>
+
+        4. Consider the following relevant case laws to analyze the legal issue:
+        <legal_research_case_laws>
+        {case}
+        </legal_research_case_laws>
+
+
+        5. Legal Research:
+        Conduct thorough legal research on the issue presented. 
+        Consult the provided case laws and identify key legal principles and precedents relevant to the legal issue. 
+        Consider all relevant legal precedents, even those that may not support an initially apparent outcome. 
+        Document your research, including key legal authorities consulted. 
+        Present this information within <research> tags.
+
+        6. Drafting the Question Presented:
+        Formulate a clear, concise statement of the legal issue at hand. 
+        Frame it as a specific question that doesn't assume a legal conclusion. 
+        Use one sentence. 
+        Present this within <question_presented> tags.
+
+        7. Drafting the Brief Answer:
+        Provide a succinct legal prediction to the question presented. 
+        Begin with "Yes" or "No" if appropriate, then give a short (4-5 sentences) explanation referencing relevant law and facts.
+        Present this within <brief_answer> tags.
+
+        8. Drafting the Discussion:
+        This is the core of your memo. 
+        Begin with an introductory paragraph outlining the structure of your discussion. 
+        Provide a detailed legal analysis including:
+        Relevant legal precedents and principles from the provided case laws
+        Critical analysis of how these apply to the case facts
+        Examination of potential counterarguments
+        Reasoned arguments supporting your conclusions
+        Organize your analysis into logical subsections, each addressing a specific aspect of the legal issue. 
+        Present a balanced analysis that considers all relevant legal precedents, even those that may not support your conclusion.
+        Present the Discussion section within <discussion> tags. 
+        Each subsection should be enclosed in its own numbered tags (e.g., <subsection_1>, <subsection_2>, etc.). 
+        Ensure that each subsection is clearly labeled with appropriate subheadings.
+
+        9. Formatting and Style:
+        Use clear, concise language appropriate for a legally sophisticated audience. 
+        Employ an active voice and avoid ambiguities or redundancies. 
+        Use headings and subheadings to enhance readability. 
+        Cite all sources accurately. 
+        Maintain an objective, impartial tone throughout the memorandum. 
+        Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+        10. Ethical considerations:
+        Remember your ethical duty to represent the law accurately and honestly. 
+        Do not misrepresent or selectively cite authorities. 
+        Include all relevant case law, even if it doesn't support the desired outcome.
+
+        Present your completed work in the following order:
+
+        <research>
+        [Your research, including key legal authorities]
+        </research>
+
+        <question_presented>
+        [Your one-sentence Question Presented]
+        </question_presented>
+
+        <brief_answer>
+        [Your Brief Answer]
+        </brief_answer>
+
+        <discussion>
+        [Introductory paragraph]
+        <subsection_1>
+        [First subsection of your Discussion, with appropriate subheading like this <<subheading>>]
+        </subsection_1>
+
+        <subsection_2>
+        [Second subsection of your Discussion, with appropriate subheading like this <<subheading>>]
+        </subsection_2>
+
+        [Additional subsections as needed like this <<subheading>>]
+        </discussion>
+
+        Your goal is to provide an objective, well-researched, and professionally written legal analysis that will inform and guide senior attorneys in their decision-making process. Ensure that your memorandum demonstrates the highest standards of professional integrity throughout the research and writing process."""
+
+
+def get_case_notes_and_ratio_para(case_notes):
+    value = ""
+    for case_note in case_notes:
+        petitioner = case_note.case.petitioner
+        respondent = case_note.case.respondent
+        case_note_text = case_note.short_text
+        ratio_para = ""
+        for para in case_note.paragraph_value:
+            ratio_para += para.text
+        value += f"""
+            <{petitioner}_v._{respondent}>
+            <casenote>{case_note_text}</casenote>
+            <ratio>{ratio_para}</ratio>
+            </{petitioner}_v._{respondent}>
+        """
+    return value
+
+
+def step_2_output_formatter_part2(value):
+    # print("Values::", value)
+    research_analysis_start = "&lt;research&gt;"
+    research_analysis_end = "&lt;/research&gt;"
+
+    pattern = f"{research_analysis_start}(.*?){research_analysis_end}"
+    research_analysis_text = re.search(pattern, value, re.DOTALL).group(1)
+
+    question_start = "&lt;question_presented&lgt;"
+    question_end = "&t;/question_presented&gt;"
+
+    pattern = f"{question_start}(.*?){question_end}"
+    question_text = re.search(pattern, value, re.DOTALL).group(1)
+
+    breif_ans_start = "&lt;brief_answer&gt;"
+    brief_ans_end = "&lt;/brief_answer&gt;"
+
+    pattern = f"{breif_ans_start}(.*?){brief_ans_end}"
+    brief_answer = re.search(pattern, value, re.DOTALL).group(1)
+
+    # pattern = r"<subsection_\d+>\s*([\s\S]*?)\s*</subsection_\d+>"
+    pattern = r"&lt;subsection_(\d+)&gt;(.*?)&lt;/subsection_\d+&gt;"
+    matches = re.findall(pattern, value)
+    decision = []
+    for i, match in enumerate(matches, 1):
+        subsection_number, content = match
+        if i == 1:
+            pattern = r"&lt;discussion&gt;(.*?)&lt;subsection_1&gt;"
+            intro_text = re.search(pattern, value, re.DOTALL).group(1)
+            # print("INTRO :::", intro_text)
+
+        if i == len(matches):
+            pattern = (
+                rf"&lt;/subsection_{subsection_number}&gt;(.*?)&lt;/discussion&gt;"
+            )
+            conclusion_text = re.search(pattern, value, re.DOTALL).group(1)
+            # print("Conclusion :::", conclusion_text)
+        # match = re.findall('<<(.*?)>>\s*(.*?)', content)
+        match = re.findall("&lt;&lt;(.*?)&gt;&gt;\s*(.*)", content)
+        if match:
+            title, text = match[0]
+            print("Title: ", title)
+            print("Content: ", text)
+            print()
+        # title = re.search(r"^(.*?)<br>", content, re.DOTALL).group(1).strip()
+        # pattern = rf"{title}(.*)"
+        # text = re.search(pattern, content, re.DOTALL).group(1).strip()
+        decision.append(
+            {
+                "index": i,
+                "title": title,
+                "content": text,
+            }
+        )
+
+    return (
+        research_analysis_text,
+        question_text,
+        decision,
+        intro_text,
+        conclusion_text,
+        brief_answer,
+    )
+
+
+def step_3_input_part2(
+    facts,
+    legal,
+    title,
+    content,
+    intro,
+    sof,
+    question,
+    brief_anwser,
+    all_discussion,
+    decision_value,
+):
+    return f"""You are a skilled legal researcher tasked with drafting the following subsection of the <Discussion> section of the legal memorandum. 
+
+    <{title}>
+    {content}
+    </{title}>
+
+    Follow these instructions carefully to complete your task:
+
+    1. Review the legal issue:
+    <legal_issue>
+    {legal}
+    </legal_issue>
+
+    2. Analyze the facts of the case:
+    <facts>
+    {facts}
+    </facts>
+
+    3. Review the existing parts of the legal memorandum:
+    <legal_memorandum>
+    <question_presented>
+    {question}
+    </question_presented>
+    <brief_answer>
+    {brief_anwser}
+    </brief_answer>
+    <statement_of_facts>
+    {sof}
+    </statement_of_facts>
+    <discussion>
+    {intro}
+    {all_discussion}
+    </discussion>
+    </legal_memorandum>
+
+    4. Consider the following relevant case law:
+    <legal_research_case_laws>
+    {decision_value}
+    </legal_research_case_laws>
+
+    5. Legal Research:
+
+    Conduct thorough legal research on the issue presented. 
+    Consult the provided case laws and identify key legal principles and precedents relevant to the legal issue. 
+    Consider all relevant legal precedents, even those that may not support an initially apparent outcome. 
+    Document your research, including key legal authorities consulted. 
+    Present this information within <research> tags.
+    6. Drafting the <<{title}>> subsection of the 'Discussion' section comprehensively and in detail:
+
+    Provide a detailed legal analysis including: 
+
+    Start with a topic sentence stating the main point. 
+    Explain relevant legal precedents, statutes, and principles. 
+    Critically analyse how these apply to the case facts. 
+    Consider and address potential counterarguments. 
+    Provide reasoned arguments supporting your conclusions.
+    Use subheadings to organize different legal topics or issues.  
+    Present a balanced analysis that considers all relevant legal precedents, even those that may not support your conclusion.
+
+    Formatting and Style:
+
+    Use clear, concise language appropriate for a legally sophisticated audience.
+    Employ an active voice and avoid ambiguities or redundancies.
+    Use headings and subheadings to enhance readability.
+    Cite all sources accurately
+    Maintain an objective, impartial tone throughout the memorandum.
+    Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+    Ethical Considerations:
+
+    Represent the law accurately and honestly.
+    Do not misrepresent or selectively cite authorities.
+    Include all relevant case law, even if it doesn't support the desired outcome.
+
+    Output:
+    1. Present your research findings within <research> tags. This should outline the key legal authorities you consulted and a brief summary of their relevance to the case.
+
+    2. Present your completed comprehensive detailed subsection within <<{title}>> tags. Ensure it provides an objective, thorough analysis of the legal issue that will inform and guide senior attorneys in their decision-making process.
+
+    Remember to maintain the highest standards of professional integrity throughout your research and writing process. Your analysis should be comprehensive, well-reasoned, and demonstrate a deep understanding of the legal issues at hand.
+
+
+"""
+
+
+def decision_value(title, content, sof):
+    # print("DESICION::", title, content)
+    openai.api_key = os.getenv("OPEN_AI")
+    decision_value = openai.embeddings.create(
+        input=[title + content], model="text-embedding-3-large"
+    )
+    sof_embeddings = openai.embeddings.create(
+        input=[sof], model="text-embedding-3-large"
+    )
+    case_notes_ids = (
+        CaseNote.objects.annotate(
+            case_note_score=CosineDistance(
+                "embeddings", sof_embeddings.data[0].embedding
+            )
+        )
+        .order_by("case_note_score")[:50]
+        .values_list("id", flat=True)
+    )
+    case_notes = (
+        CaseNote.objects.filter(id__in=case_notes_ids)
+        .annotate(
+            decision_value_score=CosineDistance(
+                "embeddings", decision_value.data[0].embedding
+            )
+        )
+        .order_by("decision_value_score")[:10]
+        .prefetch_related(
+            Prefetch(
+                "case",
+                queryset=Case.objects.all().prefetch_related(
+                    "paragraph",
+                    Prefetch(
+                        "case_note",
+                        queryset=CaseNote.objects.prefetch_related("paragraph"),
+                        to_attr="case_notes_query",
+                    ),
+                ),
+                to_attr="case_query",
+            ),
+        )
+    )
+    value = ""
+    case_law_id = []
+    word_limit = 0
+    for case_note in case_notes:
+        case_note_para = set()
+        citation_paragraphs = set()
+        case_obj = case_note.case_query
+        if case_obj.id not in case_law_id:
+            for case_note in case_obj.case_notes_query:
+                for para in case_note.paragraph.all():
+                    case_note_para.add(para.para_count)
+            print("WORD LIMIT::", word_limit)
+            if word_limit < 50000:
+                print("Less than 50")
+                for item in case_obj.citations:
+                    if item["paragraph"] is not None:
+                        citation_paragraphs.update(item["paragraph"])
+            combined_set = list(case_note_para.union(citation_paragraphs))
+            paragraphs = (
+                Caseparagraph.objects.filter(case=case_obj, para_count__in=combined_set)
+                .annotate(
+                    para_count_int=Cast(F("para_count"), output_field=FloatField())
+                )
+                .order_by("para_count_int")
+            )
+            para_text = ""
+            for para in paragraphs:
+                word_limit += count_words(para.text)
+                para_text += para.text
+            value += f"""<{case_obj.petitioner}_v._{case_obj.respondent})><casenote>{case_note.short_text}</casenote><case_text>{para_text}</case_text></{case_obj.petitioner}_v._{case_obj.respondent})>"""
+        case_law_id.append(case_obj.id)
+
+    return value
+
+
+def get_step_4_input_part2(
+    facts,
+    legal_issue,
+    question,
+    sof,
+    brief_answer,
+    decision_intro,
+    decision_text,
+):
+    return f"""You are a skilled legal researcher tasked with drafting the 'Conclusion' section of the legal memorandum. 
+        1. Follow these instructions carefully to complete your task:
+        Review the legal issue provided: <legal_issue> {legal_issue} </legal_issue>
+        Analyze the facts of the case: <facts>{facts} </facts>
+        Read and comprehend the following sections of the legal memorandum: 
+        <legal_memorandum>
+        <question_presented> 
+        {question} 
+        </question_presented>
+        <brief_answer> 
+        {brief_answer} 
+        </brief_answer>
+        <statement_of_facts> 
+
+        {sof} 
+
+        </statement_of_facts>
+
+        <discussion> 
+        {decision_intro} 
+        {decision_text} 
+        </discussion> 
+        </legal_memorandum>  
+
+        2. Draft the 'Conclusion' section of the memorandum, following these guidelines:
+
+        a. Summarize your analysis and reiterate the brief answer to the question presented.
+        b. Clearly state your final recommendations or findings based on the legal analysis.
+        c. Identify the critical laws that were pivotal in your analysis.
+        d. Predict how a court might apply the law to the given facts and express your confidence level in this prediction.
+        e. Propose next steps and a legal strategy to proceed with the case.
+
+        3. Adhere to the following formatting and style guidelines:
+
+        a. Use clear, concise language appropriate for a legally sophisticated audience.
+        b. Employ an active voice and avoid ambiguities or redundancies.
+        c. Use headings and subheadings to enhance readability, if necessary.
+        d. Cite all sources accurately.
+        e. Maintain an objective, impartial tone throughout.
+        f. Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+        4. Present your completed 'Conclusion' section of the legal memorandum within <conclusion> tags.
+        Before drafting your conclusion, use <scratchpad> tags to organize your thoughts and outline the key points you will address. This will help ensure a well-structured and comprehensive conclusion.  
+
+        Remember to maintain the highest standards of professional integrity throughout your writing process. Your conclusion should provide an objective, thorough analysis of the legal issue at hand, synthesizing the information from the question presented, statement of facts, and discussion sections. Your goal is to provide a well-researched and professionally written legal analysis that will inform and guide senior attorneys in their decision-making process.
+
+
+"""
+
+
+def get_step4_output_formatter(value):
+    # print("step_4:::", value)
+    conclusion_start = "&lt;conclusion&gt;"
+    conclusion_end = "&lt;/conclusion&gt;"
+
+    pattern = f"{conclusion_start}(.*?){conclusion_end}"
+    conclusion_text = re.search(pattern, value, re.DOTALL).group(1)
+    # print("CONCLUSSION:::", conclusion_text)
+
+    return conclusion_text
+
+
+def get_step_5_input_part2(question, sof, brief_answer, decision_text, conclusion):
+    return f"""
+        You are a highly skilled legal researcher tasked with reviewing, editing, and refining a legal memorandum. Your goal is to produce a comprehensive, well-structured, and professionally written document that will serve as a valuable resource for senior attorneys in their decision-making process. Follow these instructions carefully to create a high-quality legal memorandum.
+
+        You are provided with the following draft legal memorandum:
+
+        <question_presented>{question}</question_presented>
+        <brief_answer>{brief_answer}</brief_answer>
+        <statement_of_facts>{sof}</statement_of_facts>
+        <discussion>{decision_text}</discussion>
+        <conclusion>{conclusion}</conclusion>
+
+        Your task is to review, edit, and refine these sections to create a cohesive and professional legal memorandum. The final document should adhere to the following structure:
+
+        1. Question Presented
+        2. Brief Answer
+        3. Statement of Facts
+        4. Discussion
+        5. Conclusion
+
+
+        Throughout the editing process, adhere to these formatting and style guidelines:
+
+        - Use clear, concise language appropriate for a legally sophisticated audience.
+        - Employ an active voice and avoid ambiguities or redundancies.
+        - Use headings and subheadings to enhance readability.
+        - Cite all sources accurately.
+        - Maintain an objective, impartial tone throughout the memorandum.
+        - Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+        After completing your initial edit, conduct a thorough review:
+
+        - Check for structural coherence and logical flow of arguments.
+        - Eliminate any remaining ambiguities, redundancies, or instances of passive voice.
+        - Verify all legal citations and ensure they accurately support your assertions.
+        - Eliminate any instances of bias or misrepresentation of the law.
+        - Double-check all citations for accuracy and ensure all case law cited remains good law.
+        - Proofread for grammatical errors and typos.
+
+        Present your completed legal memorandum within <legal_memo> tags. Each main section should be enclosed in its own tags (e.g., <question_presented>, <brief_answer>, etc.). Ensure that each section of the memo is clearly labeled with appropriate subheadings.
+
+        Remember to maintain the highest standards of professional integrity throughout your editing process. Your memorandum should provide an objective, thorough analysis of the legal issue at hand, serving as a valuable resource for senior attorneys in their decision-making process."""
+
+
+def legal_memo_formatter(text):
+    string = text.replace("&amp;", "&")
+
+    full_legal_memo_original = re.search(
+        r"&lt;legal_memo&gt;(.*?)&lt;\/legal_memo&gt;",
+        text,
+        re.DOTALL,
+    ).group(1)
+
+    brief_answer_start = "&lt;brief_answer&gt;"
+    brief_answer_end = "&lt;/brief_answer&gt;"
+    pattern = f"{brief_answer_start}(.*?){brief_answer_end}"
+    brief_answer = re.search(pattern, text, re.DOTALL).group(1)
+
+    conclusion_start = "&lt;conclusion&gt;"
+    conclusion_end = "&lt;/conclusion&gt;"
+    pattern = f"{conclusion_start}(.*?){conclusion_end}"
+    conclusion = re.search(pattern, text, re.DOTALL).group(1)
+
+    sof_start = "&lt;conclusion&gt;"
+    sof_end = "&lt;/conclusion&gt;"
+    pattern = f"{sof_start}(.*?){sof_end}"
+    sof = re.search(pattern, text, re.DOTALL).group(1)
+
+    pattern = r"&lt;subsection_(\d+)&gt;(.*?)&lt;/subsection_\d+&gt;"
+    matches = re.findall(pattern, text)
+    decision_value = []
+    for i, match in enumerate(matches, 1):
+        subsection_number, content = match
+        title = re.search(r"^(.*?)<br>", content, re.DOTALL).group(1).strip()
+        pattern = rf"{title}(.*)"
+        text = re.search(pattern, content, re.DOTALL).group(1).strip()
+        decision_value.append(
+            {
+                "index": i,
+                "title": title,
+                "content": text,
+            }
+        )
+        # print("TECHNOLOGY:::::",title, text)
+        # pattern = rf"&lt;/subsection_{subsection_number}&gt;(.*?)&lt;/subsection_{subsection_number}&gt;"
+    return brief_answer, sof, conclusion, decision_value, full_legal_memo_original
+
+
+def count_words(text):
+    # Split the text into words using whitespace as the delimiter
+    words = text.split()
+    # Return the number of words
+    return len(words)
+
+
+def step2_setup():
+    cases = Case.objects.all()[:2]
+    for case in cases:
+        print("ID::", case.id)
+        cases_reffered = set()
+        # print("CITATIONS::", case.citations)
+        for item in case.citations:
+            if item["name"] is not None:
+                cases_reffered.add(item["name"])
+        # print("CASES REFERED NAME::", list(cases_reffered))
+
+        # Create a Q object for each case code in cases_reffered
+        q_objects = [Q(code__contains=code) for code in cases_reffered]
+        # Combine the Q objects with OR
+        query = functools.reduce(operator.or_, q_objects)
+        # Filter the cases using the combined query
+        referred_cases = Case.objects.filter(query)
+        print(referred_cases)
+        # AIR 2019 SUPREME COURT 5543 :: AIROnline 2019 SC 1268
+        # Save the case references
+        case.case_references.set(referred_cases)
+        case.save()
+
+
+def perplexity_scrape(link):
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+            ],
+        )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
+        page = context.new_page()
+        page.set_viewport_size({"width": 1920, "height": 1080})
+
+        # Go to the URL
+        page.goto(link)
+
+        # Wait for the necessary elements to be loaded
+        page.wait_for_selector("span.rounded-md.duration-150", timeout=60000)
+        page.wait_for_selector("div.prose", timeout=60000)
+
+        # Scrape all the required text for the first structure
+        titles = page.query_selector_all("span.rounded-md.duration-150")
+        prose_elements = page.query_selector_all("div.prose")
+
+        # Scrape the required text
+        title_list = []
+        for index, title in enumerate(titles):
+            title_list.append({index: title.inner_text()})
+
+        # Extract and print the text for div prose spans (first structure)
+        combined_texts = []
+        for index, prose in enumerate(prose_elements):
+            # Extract the text from the paragraph span inside the current div.prose
+            # paragraph_text = prose.query_selector("span").inner_text()
+
+            # # Initialize the combined_text with the paragraph text
+            # combined_text = paragraph_text
+
+            # Extract all paragraphs inside the current div.prose
+            combined_text = ""
+            paragraphs = prose.query_selector_all("span")
+            for paragraph in paragraphs:
+                paragraph_text = paragraph.inner_text().strip()
+                combined_text += paragraph_text + "\n"
+
+            # Check if the list items exist inside the current div.prose
+            if prose.query_selector("ul.list-disc li span"):
+
+                # Extract the text from each li span inside ul.list-disc
+                list_items = prose.query_selector_all("ul.list-disc li span")
+                list_texts = [
+                    f"{index}. {item.inner_text()}"
+                    for index, item in enumerate(list_items, start=1)
+                ]
+
+                # Append the list texts to the combined_text variable
+                combined_text += "\n" + "\n".join(list_texts)
+
+            # Add the combined text to the list
+            combined_texts.append({index: combined_text})
+
+        merged_list = []
+
+        # Iterate through the first list
+        for title in title_list:
+            key = list(title.values())[0]
+            value = list(combined_texts[list(title.keys())[0]].values())[0]
+            merged_dict = {key: value}
+            merged_list.append(merged_dict)
+
+        for i in merged_list:
+            print(i)
+            print()
+        # Close browser
+        # browser.close()
+    return merged_list
+
+
+def rerank_documents(query, documents, co):
+    return co.rerank(
+        model="rerank-english-v3.0",
+        query=query,
+        documents=documents,
+        top_n=10,
+        return_documents=True,
+    )
+
+
+def get_case_ids(case_note_ids):
+    return (
+        CaseNote.objects.filter(id__in=case_note_ids)
+        .order_by("case__id")
+        .values_list("case__id", flat=True)
+        .distinct()
+    )
+
+
+def get_top_cases(research, query):
+    co = cohere.Client(api_key=os.getenv("COHERE_API"))
+    openai.api_key = os.getenv("OPEN_AI")
+    reseach_embed = openai.embeddings.create(
+        input=[research], model="text-embedding-3-large"
+    )
+
+    case_notes = (
+        CaseNote.objects.annotate(
+            case_note_score=CosineDistance(
+                "embeddings", reseach_embed.data[0].embedding
+            )
+        )
+        .order_by("case_note_score")
+        .values("id", "short_text")[:1000]
+    )
+    dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
+    documents = [doc["short_text"] for doc in case_notes]
+    results = rerank_documents(query, documents, co)
+    for i in results.results:
+        print("TEXT::",i.document.text)
+        print("INDEX::", i.index)
+        print("SCORE::", i.relevance_score)
+    case_note_text_list = [doc.index for doc in results.results]
+    print("Index list::", case_note_text_list)
+    case_note_ids = [
+        dict_value[index] for index in case_note_text_list if index in dict_value
+    ]
+    print("Final List::", case_note_ids)
+    case_ids = list(get_case_ids(case_note_ids))
+
+    return case_ids[:4]
+
+
+def get_research_and_query(value):
+    research_analysis = re.search("<research>(.*?)</research>", value, re.DOTALL).group(
+        1
+    )
+    search_query = re.search(
+        "<search_query>(.*?)</search_query>", value, re.DOTALL
+    ).group(1)
+    return research_analysis, search_query
