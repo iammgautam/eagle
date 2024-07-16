@@ -1672,7 +1672,7 @@ def count_words(text):
 def step2_setup():
     cases = Case.objects.all()[:2]
     for case in cases:
-        print("ID::", case.id)
+        # print("ID::", case.id)
         cases_reffered = set()
         # print("CITATIONS::", case.citations)
         for item in case.citations:
@@ -1686,7 +1686,7 @@ def step2_setup():
         query = functools.reduce(operator.or_, q_objects)
         # Filter the cases using the combined query
         referred_cases = Case.objects.filter(query)
-        print(referred_cases)
+        # print(referred_cases)
         # AIR 2019 SUPREME COURT 5543 :: AIROnline 2019 SC 1268
         # Save the case references
         case.case_references.set(referred_cases)
@@ -1766,9 +1766,9 @@ def perplexity_scrape(link):
             merged_dict = {key: value}
             merged_list.append(merged_dict)
 
-        for i in merged_list:
-            print(i)
-            print()
+        # for i in merged_list:
+        #     print(i)
+        #     print()
         # Close browser
         # browser.close()
     return merged_list
@@ -1812,16 +1812,16 @@ def get_top_cases(research, query):
     dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
     documents = [doc["short_text"] for doc in case_notes]
     results = rerank_documents(query, documents, co)
-    for i in results.results:
-        print("TEXT::",i.document.text)
-        print("INDEX::", i.index)
-        print("SCORE::", i.relevance_score)
+    # for i in results.results:
+    #     print("TEXT::",i.document.text)
+    #     print("INDEX::", i.index)
+        # print("SCORE::", i.relevance_score)
     case_note_text_list = [doc.index for doc in results.results]
-    print("Index list::", case_note_text_list)
+    # print("Index list::", case_note_text_list)
     case_note_ids = [
         dict_value[index] for index in case_note_text_list if index in dict_value
     ]
-    print("Final List::", case_note_ids)
+    # print("Final List::", case_note_ids)
     case_ids = list(get_case_ids(case_note_ids))
 
     return case_ids[:4]

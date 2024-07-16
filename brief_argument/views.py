@@ -327,7 +327,7 @@ def main_page(request):
     # # Caseparagraph.objects.bulk_update(id_list, ['text', 'para_count'])
     # print("::::::: Case Paragraph Done::::::")
     # step2_setup()
-    print("EMPTY CASE PARA:::",Case.objects.filter(paragraph__isnull=True).count())
+    # print("EMPTY CASE PARA:::",Case.objects.filter(paragraph__isnull=True).count())
     # get_top_cases("This is the text of task 1", "This is the query text")
     # print(CaseNote.objects.filter(case__id='4def5390-17ed-4f91-a456-a0c62a857c4e').values_list("short_text", flat=True))
     # case_notes = (
