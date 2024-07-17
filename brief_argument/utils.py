@@ -5,6 +5,13 @@ import functools
 import operator
 import cohere
 import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 from playwright.sync_api import sync_playwright
 from pgvector.django import CosineDistance
 from brief_argument.models import default_embeddings
@@ -1711,7 +1718,8 @@ def perplexity_scrape(link):
 
         # Go to the URL
         page.goto(link)
-
+        print("LINK:", link)
+        print("Page", page)
         # Wait for the necessary elements to be loaded
         page.wait_for_selector("span.rounded-md.duration-150", timeout=60000)
         page.wait_for_selector("div.prose", timeout=60000)
@@ -1835,3 +1843,87 @@ def get_research_and_query(value):
         "<search_query>(.*?)</search_query>", value, re.DOTALL
     ).group(1)
     return research_analysis, search_query
+
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import os
+
+def perplexity_scrape_selenium(link):
+    # Set up Chrome options for headless operation
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-setuid-sandbox")
+    chrome_options.add_argument("--remote-debugging-port=9222")
+
+    # Set up the WebDriver
+    # service = Service("/path/to/chromedriver")  # Adjust this path
+    # driver = webdriver.Chrome(service=service, options=chrome_options)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service)
+
+    try:
+        # Navigate to the URL
+        driver.get(link)
+
+        # Wait for the necessary elements to be loaded
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "span.rounded-md.duration-150"))
+        )
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.prose"))
+        )
+
+        # Scrape all the required text
+        titles = driver.find_elements(By.CSS_SELECTOR, "span.rounded-md.duration-150")
+        prose_elements = driver.find_elements(By.CSS_SELECTOR, "div.prose")
+
+        # Extract titles
+        title_list = [{index: title.text} for index, title in enumerate(titles)]
+
+        # Extract prose content
+        combined_texts = []
+        for index, prose in enumerate(prose_elements):
+            combined_text = ""
+
+            # Extract all paragraphs inside the current div.prose
+            paragraphs = prose.find_elements(By.TAG_NAME, "span")
+            for paragraph in paragraphs:
+                paragraph_text = paragraph.text.strip()
+                combined_text += paragraph_text + "\n"
+
+            # Check if there are list items inside the current div.prose
+            list_items = prose.find_elements(By.CSS_SELECTOR, "ul.list-disc li span")
+            if list_items:
+                list_texts = [f"{i+1}. {item.text}" for i, item in enumerate(list_items)]
+                combined_text += "\n" + "\n".join(list_texts)
+
+            combined_texts.append({index: combined_text.strip()})
+
+        # Merge the titles and content
+        merged_list = []
+        for title in title_list:
+            key = list(title.values())[0]
+            value = list(combined_texts[list(title.keys())[0]].values())[0]
+            merged_dict = {key: value}
+            merged_list.append(merged_dict)
+
+        return merged_list
+
+    finally:
+        # Close the browser
+        driver.quit()
+
+# Example usage:
+# result = perplexity_scrape("https://example.com")
+# for item in result:
+#     print(item)
+#     print()

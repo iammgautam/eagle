@@ -46,6 +46,7 @@ from .utils import (
     get_top_cases,
     legal_memo_formatter,
     perplexity_scrape,
+    perplexity_scrape_selenium,
     send_legal_memo_detail,
     relevent_topics_input_generator,
     send_aib_mail,
@@ -661,7 +662,7 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     @action(detail=True, methods=["POST"])
     def step_2_submit(self, request, pk=None):
         cc_case_obj = self.get_object()
-        cocounsel_data = perplexity_scrape(request.data.get("link"))
+        cocounsel_data = perplexity_scrape_selenium(request.data.get("link"))
         data = {
             "citations": cocounsel_data,
             "case_ids_list": f"{request.data.get("case_ids_list")}",
