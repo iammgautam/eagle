@@ -1679,25 +1679,53 @@ def count_words(text):
 def step2_setup():
     cases = Case.objects.all()[:2]
     for case in cases:
-        # print("ID::", case.id)
-        cases_reffered = set()
-        # print("CITATIONS::", case.citations)
+        case_code_obj_list = []
         for item in case.citations:
             if item["name"] is not None:
-                cases_reffered.add(item["name"])
-        # print("CASES REFERED NAME::", list(cases_reffered))
+                pattern = r"\s*\([^)]+\)\s*$"
+                # Check if the text ends with parentheses
+                if re.search(pattern, item["name"]):
+                    result = re.sub(pattern, "", item["name"])
+                    result = result.strip()  # Remove any trailing whitespace
+                    if item["name"].startswith("AIR ") and (
+                        "SC" in item["name"]
+                        or "SUPREME COURT" in item["name"]
+                        or "(Supp)" not in item["name"]
+                    ):
+                        result = result
+                    else:
+                        result = None
+                else:
+                    if item["name"].startswith("AIR ") and (
+                        "SC" in item["name"]
+                        or "SUPREME COURT" in item["name"]
+                        or "(Supp)" not in item["name"]
+                    ):
+                        result = item["name"]
+                    else:
+                        result = None
+                print(result)
+                if result is not None:
+                    parts = result.split(" ")
+                    if len(parts) >= 3:  # ['AIR', '2000', 'ABC', '123']
+                        year = parts[1]
+                        exact_case_code_one = f"AIR {year} SUPREME COURT {parts[-1]}"
+                        exact_case_code_two = f"AIR {year} SC {parts[-1]}"
 
-        # Create a Q object for each case code in cases_reffered
-        q_objects = [Q(code__contains=code) for code in cases_reffered]
-        # Combine the Q objects with OR
-        query = functools.reduce(operator.or_, q_objects)
-        # Filter the cases using the combined query
-        referred_cases = Case.objects.filter(query)
-        # print(referred_cases)
-        # AIR 2019 SUPREME COURT 5543 :: AIROnline 2019 SC 1268
-        # Save the case references
-        case.case_references.set(referred_cases)
-        case.save()
+                        case_code = CaseCode.objects.filter(
+                            Q(case_code=exact_case_code_one)
+                            | Q(case_code=exact_case_code_two)
+                        ).values("case")
+                        if case_code:
+                            case_code_obj_list.append(case_code)
+        print("Case COde::", case_code_obj_list)
+        if case_code_obj_list:
+            cases_reffered = set()
+            for case in case_code_obj_list:
+                cases_reffered.add(case.case_code)
+            case.case_references.add(cases_reffered)
+            case.save()
+            #     pass
 
 
 def perplexity_scrape(link):
@@ -1796,9 +1824,9 @@ def get_case_ids(case_note_ids):
     return (
         CaseNote.objects.filter(id__in=case_note_ids)
         .order_by("case__id")
-        .values_list("case__id", flat=True)
+        .values("case__id", "case__code")
         .distinct()
-    )
+    )[:4]
 
 
 def get_top_cases(research, query):
@@ -1823,16 +1851,16 @@ def get_top_cases(research, query):
     # for i in results.results:
     #     print("TEXT::",i.document.text)
     #     print("INDEX::", i.index)
-        # print("SCORE::", i.relevance_score)
+    # print("SCORE::", i.relevance_score)
     case_note_text_list = [doc.index for doc in results.results]
     # print("Index list::", case_note_text_list)
     case_note_ids = [
         dict_value[index] for index in case_note_text_list if index in dict_value
     ]
     # print("Final List::", case_note_ids)
-    case_ids = list(get_case_ids(case_note_ids))
+    return get_case_ids(case_note_ids)
 
-    return case_ids[:4]
+    # return case_ids
 
 
 def get_research_and_query(value):
@@ -1845,85 +1873,30 @@ def get_research_and_query(value):
     return research_analysis, search_query
 
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import os
+from django.db import transaction
+from .models import Case, CaseCode
 
-def perplexity_scrape_selenium(link):
-    # Set up Chrome options for headless operation
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--disable-setuid-sandbox")
-    chrome_options.add_argument("--remote-debugging-port=9222")
 
-    # Set up the WebDriver
-    # service = Service("/path/to/chromedriver")  # Adjust this path
-    # driver = webdriver.Chrome(service=service, options=chrome_options)
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service)
+def insert_case_codes():
+    with transaction.atomic():
+        # Fetch all cases
+        CaseCode.objects.all().delete()
+        cases = Case.objects.all()
 
-    try:
-        # Navigate to the URL
-        driver.get(link)
+        # Create a list to hold all CaseCode instances
+        case_codes_to_create = []
 
-        # Wait for the necessary elements to be loaded
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "span.rounded-md.duration-150"))
-        )
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.prose"))
-        )
+        for case in cases:
+            # Split the case_reference field
+            codes = case.code.split("::")
+            # Create CaseCode instances for each code
+            for code in codes:
+                code = code.replace("\n", "")
+                code = code.replace("\t", "")
+                case_codes_to_create.append(CaseCode(case=case, case_code=code.strip()))
+        print("Starting Bulk Creation")
+        # Bulk create all CaseCode instances
+        CaseCode.objects.bulk_create(case_codes_to_create)
 
-        # Scrape all the required text
-        titles = driver.find_elements(By.CSS_SELECTOR, "span.rounded-md.duration-150")
-        prose_elements = driver.find_elements(By.CSS_SELECTOR, "div.prose")
 
-        # Extract titles
-        title_list = [{index: title.text} for index, title in enumerate(titles)]
-
-        # Extract prose content
-        combined_texts = []
-        for index, prose in enumerate(prose_elements):
-            combined_text = ""
-
-            # Extract all paragraphs inside the current div.prose
-            paragraphs = prose.find_elements(By.TAG_NAME, "span")
-            for paragraph in paragraphs:
-                paragraph_text = paragraph.text.strip()
-                combined_text += paragraph_text + "\n"
-
-            # Check if there are list items inside the current div.prose
-            list_items = prose.find_elements(By.CSS_SELECTOR, "ul.list-disc li span")
-            if list_items:
-                list_texts = [f"{i+1}. {item.text}" for i, item in enumerate(list_items)]
-                combined_text += "\n" + "\n".join(list_texts)
-
-            combined_texts.append({index: combined_text.strip()})
-
-        # Merge the titles and content
-        merged_list = []
-        for title in title_list:
-            key = list(title.values())[0]
-            value = list(combined_texts[list(title.keys())[0]].values())[0]
-            merged_dict = {key: value}
-            merged_list.append(merged_dict)
-
-        return merged_list
-
-    finally:
-        # Close the browser
-        driver.quit()
-
-# Example usage:
-# result = perplexity_scrape("https://example.com")
-# for item in result:
-#     print(item)
-#     print()
+# Call the function to perform the insert operation

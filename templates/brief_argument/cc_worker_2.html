@@ -29,13 +29,24 @@
                 <br><br>
             </div>
             <br>
+            <label for="generate_command">Paste Link Here::</label>
+            <input type="text" id="generate_command" name="generate_command" v-model="link_value" ref="generate_command">
+            <button @click="generate_command_funct">Generate</button>
             <br>
             <br>
-            <label for="output_value">OUTPUT</label>
-            <textarea id="output_value" name="output_value" v-model="output_value"
-                style="height: 100px; width: 300px;"></textarea>
+            <div v-if="command_value">
+                <label for="final_command">Command:</label>
+                <input type="text" id="final_command" name="final_command" v-model="command_value" ref="final_command"
+                    readonly>
+                <button @click="copyText('final_command')">Copy</button>
+            </div>
+            <br><br>
+            <label for="output_value">Did you run the scraping code with the perplexity link?</label>
+            <input id="output_value" name="output_value" v-model="output_value" type="checkbox">
             <br>
-            <input type="submit" value="Submit" @click="pasteAndSubmit">
+            <div v-if="output_value">
+                <input type="submit" value="Submit" @click="pasteAndSubmit">
+            </div>
         </div>
     </div>
 </body>
@@ -45,8 +56,11 @@
     const app = createApp({
         setup() {
             const uuid = window.location.href.split('/');
-            const output_value = ref('');
+            const output_value = ref(false);
             const input_1_value = ref('');
+            const id_value = ref('');
+            const link_value = ref('');
+            const command_value = ref('');
             const case_para_list = ref([]);
             const case_ids_list = ref([]);
             const input_1 = ref(null);
@@ -83,6 +97,14 @@
                         inputField.select();
                         document.execCommand('copy');
                         break;
+                    case 'generate_command':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
+                    case 'final_command':
+                        inputField.select();
+                        document.execCommand('copy');
+                        break;
                     default:
                         console.log('Invalid value');
                 }
@@ -92,6 +114,7 @@
                     input_1_value.value = response.data["input_1"];
                     case_para_list.value = response.data["case_para_list"];
                     case_ids_list.value = response.data["case_ids_list"];
+                    id_value.value = response.data["case_id"];
                     show_data.value = true;
                 }).catch(error => {
                     console.error(error);
@@ -99,7 +122,7 @@
             };
             const pasteAndSubmit = () => {
                 axios.post('/api/cocounsel/' + uuid[4] + '/step_2_submit/', {
-                    link: output_value.value,
+                    link: link_value.value,
                     case_ids_list: case_ids_list.value,
                 }, {
                     headers: {
@@ -113,11 +136,15 @@
                     console.error(error);
                 });
             };
+            const generate_command_funct = () => {
+                command_value.value = "python3 scrape.py " + link_value.value + " " + id_value.value;
+            };
 
             return {
                 copyText,
                 get_data,
                 pasteAndSubmit,
+                generate_command_funct,
                 output_value,
                 show_data,
                 input_1_value,
@@ -126,6 +153,9 @@
                 input_1,
                 input_2,
                 input_3,
+                id_value,
+                link_value,
+                command_value,
 
             };
         },

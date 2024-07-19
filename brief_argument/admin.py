@@ -6,7 +6,7 @@ from .models import (
     HulsburyLawBooks,
     RelevantCitationsPassage,
     StatementEmbeddings,
-    Case,CaseNote, Caseparagraph, caseNotesKeyword, CoCounsel
+    Case,CaseNote, Caseparagraph, caseNotesKeyword, CoCounsel, CaseCode
 )
 
 
@@ -128,3 +128,7 @@ class CoCounselAdmin(admin.ModelAdmin):
         "modified_date",
         "is_completed",
     )
+
+@admin.register(CaseCode)
+class CaseCodeAdmin(admin.ModelAdmin):
+    list_display = ("case", "case_code",)

@@ -4209,7 +4209,20 @@ class Case(models.Model):
     modified_date = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'{self.code}'
+        return f"{self.code}"
+    
+class CaseCode(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey('Case', on_delete=models.CASCADE)
+    case_code = models.TextField()
+
+    class Meta:
+        db_table = 'case_codes'
+
+    def __str__(self):
+        return f"Case Code {self.case.id}: {self.case_code}"
+
+
 
 class Caseparagraph(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -4245,16 +4258,26 @@ class caseNotesKeyword(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)
 
+
 class CoCounsel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     legal_issue = models.TextField(verbose_name=_("Legal Issue"), null=True, blank=True)
     brief_facts = models.TextField(verbose_name=_("Brief Facts"), null=True, blank=True)
     case_facts = models.TextField(verbose_name=_("Case Facts"), null=True, blank=True)
-    legal_research = models.TextField(verbose_name=_("Legal Research"), null=True, blank=True)
-    research_analysis = models.TextField(verbose_name=_("Research Analysis"), null=True, blank=True)
-    search_query = models.TextField(verbose_name=_("Search Query"), null=True, blank=True)
+    legal_research = models.TextField(
+        verbose_name=_("Legal Research"), null=True, blank=True
+    )
+    research_analysis = models.TextField(
+        verbose_name=_("Research Analysis"), null=True, blank=True
+    )
+    search_query = models.TextField(
+        verbose_name=_("Search Query"), null=True, blank=True
+    )
     is_completed = models.BooleanField("Completed", default=False, blank=True)
     citations = models.JSONField(default=dict, blank=True)
     case_ids_list = models.TextField(verbose_name=_("Case Ids"), null=True, blank=True)
+    scrape_link = models.URLField(
+        verbose_name=_("Scrapping Link"), null=True, blank=True
+    )
     created_date = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)

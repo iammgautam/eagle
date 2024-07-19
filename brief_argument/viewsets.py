@@ -46,7 +46,6 @@ from .utils import (
     get_top_cases,
     legal_memo_formatter,
     perplexity_scrape,
-    perplexity_scrape_selenium,
     send_legal_memo_detail,
     relevent_topics_input_generator,
     send_aib_mail,
@@ -646,15 +645,30 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     def get_step_2(self, request, pk=None):
         cc_case_obj = self.get_object()
         input_1 = f"{cc_case_obj.search_query}"
-        case_ids = get_top_cases(
+        top_cases = get_top_cases(
             cc_case_obj.research_analysis, cc_case_obj.search_query
         )
+        render_case = []
+        for case in top_cases:
+            render_case.append({
+                "id": case["case__id"],
+                "code": case["case__code"],
+            })
+        print("RENDERSER::", render_case)
+        case_ids = [str(item['case__id']) for item in top_cases]
+        data = {
+            "case_ids_list": f"{render_case}",
+        }
+        serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
         input_list = self.get_selected_para(case_ids)
         return Response(
             {
                 "input_1": input_1,
                 "case_para_list": input_list,
                 "case_ids_list": case_ids,
+                "case_id": cc_case_obj.id,
             },
             status=status.HTTP_200_OK,
         )
@@ -662,11 +676,11 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     @action(detail=True, methods=["POST"])
     def step_2_submit(self, request, pk=None):
         cc_case_obj = self.get_object()
-        cocounsel_data = perplexity_scrape_selenium(request.data.get("link"))
+        # cocounsel_data = perplexity_scrape(request.data.get("link"))
+        print("LINK", request.data.get("link"))
         data = {
-            "citations": cocounsel_data,
-            "case_ids_list": f"{request.data.get("case_ids_list")}",
             "is_completed": True,
+            "scrape_link": request.data.get("link"),
         }
         serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
         serializer.is_valid(raise_exception=True)

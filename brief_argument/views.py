@@ -22,6 +22,7 @@ from brief_argument.scraper2 import run_playwright
 from .models import (
     Argument,
     Case,
+    CaseCode,
     CaseNote,
     Caseparagraph,
     Legal_Memorandum,
@@ -51,8 +52,8 @@ from .utils import (
     get_step_4_input_part2,
     get_step_5_input_part2,
     get_top_cases,
+    insert_case_codes,
     perplexity_scrape,
-    perplexity_scrape_selenium,
     send_legal_memo_detail,
     aib_exam__step_1_input,
     aib_exam_step_2_input,
@@ -292,6 +293,10 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
+    # step2_setup()
+    # print("CASE::",Case.objects.filter(citations__in="Pramatha Nath Talukdar v. Saroj Ranjan Sarkar"))
+    # insert_case_codes()
+    # print("HAHAHAHAHAHA::",CaseCode.objects.filter(case__id="37ce3168-52ae-4fc5-941a-4f6c8ce838a2"))
     # case_notes = CaseNote.objects.all()
     # index = 0
     # case_notes_ids = []
@@ -338,7 +343,7 @@ def main_page(request):
     # dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
 
     # print("CASES::", [doc for doc in case_notes])
-    print(perplexity_scrape_selenium("https://www.perplexity.ai/page/session-of-the-flat-An8Ly5R5Tj.IsN3A.ZWxAA"))
+    # print(perplexity_scrape_selenium("https://www.perplexity.ai/page/session-of-the-flat-An8Ly5R5Tj.IsN3A.ZWxAA"))
     csrf_token = get_token(request)
     return render(request, "brief_argument/main_page.html", {"csrf_token": csrf_token})
 

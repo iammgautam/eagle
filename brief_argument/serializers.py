@@ -241,6 +241,7 @@ class CoCounselSerializers(serializers.ModelSerializer):
             "search_query",
             "is_completed",
             "citations",
+            "scrape_link",
             "case_ids_list",
             "created_date",
             "modified_date",
