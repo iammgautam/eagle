@@ -126,7 +126,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
         # Extract the main text
         all_text = main_div.text
 
-        memo_url = f"http://localhost:8000/api/cocounsel/{memo['id']}/get_case_ids/"
+        memo_url = f"http://13.200.242.60:8000/api/cocounsel/{memo['id']}/get_case_ids/"
 
         data_to_send = {
             "step_1_op": all_text,
