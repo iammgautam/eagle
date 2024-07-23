@@ -43,6 +43,7 @@ from .serializers import (
     RelevantCitationsPassageSerializer,
 )
 from .utils import (
+    case_file_generation,
     decision_value,
     get_case_notes_and_ratio_para,
     get_step_1_input_part2,
@@ -293,14 +294,23 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
-    # step2_setup()
-    # print("CASE::",Case.objects.filter(citations__in="Pramatha Nath Talukdar v. Saroj Ranjan Sarkar"))
+    # case_file_generation()
+    # step2_setup())
+    # insert_case_codes()
+    # get_top_cases()
+    # print("CASE::",CaseNote.objects.filter(case='0a0a35a1-48cf-45d8-98e0-2bd6b490fb89').first().short_text)
     # insert_case_codes()
     # print("HAHAHAHAHAHA::",CaseCode.objects.filter(case__id="37ce3168-52ae-4fc5-941a-4f6c8ce838a2"))
     # case_notes = CaseNote.objects.all()
     # index = 0
     # case_notes_ids = []
     # for case_note in case_notes:
+    #     short_note = case_note.short_text
+    #     long_note = case_note.long_text
+    #     if short_note and long_note is not None:
+    #         case_note.short_text = short_note + long_note
+    #         case_note.long_text = ''
+    #         case_note.save()
     #     pattern = r"\(Para[^)]*\)"
     #     case_note.short_text = case_note.short_text.replace("\n", '')
     #     case_note.short_text = case_note.short_text.replace("\t", '')

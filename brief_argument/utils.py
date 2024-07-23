@@ -1,17 +1,8 @@
 import re
 import docx
 import ast
-import functools
-import operator
 import cohere
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from playwright.sync_api import sync_playwright
 from pgvector.django import CosineDistance
 from brief_argument.models import default_embeddings
@@ -20,10 +11,9 @@ from openai import OpenAI
 import lxml.etree
 from django.template.loader import render_to_string
 from django.db.models.functions import Cast
-from django.db.models import Q, Prefetch, Count, FloatField, F
+from django.db.models import Q, Prefetch, FloatField, F
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
-from brief_argument.scraper2 import run_playwright
 from legal_gpt import settings
 from case_history.models import LawTopics
 from brief_argument.models import (
@@ -1677,8 +1667,15 @@ def count_words(text):
 
 
 def step2_setup():
-    cases = Case.objects.all()[:2]
+    cases = Case.objects.all()
+
     for case in cases:
+        case.code = case.code.replace("\n", "")
+        case.code = case.code.replace("\t", "")
+        case.save()
+    index = 0
+    for case in cases:
+        print("ID::", case.id)
         case_code_obj_list = []
         for item in case.citations:
             if item["name"] is not None:
@@ -1687,24 +1684,23 @@ def step2_setup():
                 if re.search(pattern, item["name"]):
                     result = re.sub(pattern, "", item["name"])
                     result = result.strip()  # Remove any trailing whitespace
-                    if item["name"].startswith("AIR ") and (
-                        "SC" in item["name"]
-                        or "SUPREME COURT" in item["name"]
-                        or "(Supp)" not in item["name"]
+                    if (
+                        item["name"].startswith("AIR ")
+                        and ("SC" in item["name"] or "SUPREME COURT" in item["name"])
+                        and "(Supp)" not in item["name"]
                     ):
                         result = result
                     else:
                         result = None
                 else:
-                    if item["name"].startswith("AIR ") and (
-                        "SC" in item["name"]
-                        or "SUPREME COURT" in item["name"]
-                        or "(Supp)" not in item["name"]
+                    if (
+                        item["name"].startswith("AIR ")
+                        and ("SC" in item["name"] or "SUPREME COURT" in item["name"])
+                        and "(Supp)" not in item["name"]
                     ):
                         result = item["name"]
                     else:
                         result = None
-                print(result)
                 if result is not None:
                     parts = result.split(" ")
                     if len(parts) >= 3:  # ['AIR', '2000', 'ABC', '123']
@@ -1715,16 +1711,18 @@ def step2_setup():
                         case_code = CaseCode.objects.filter(
                             Q(case_code=exact_case_code_one)
                             | Q(case_code=exact_case_code_two)
-                        ).values("case")
+                        )
                         if case_code:
-                            case_code_obj_list.append(case_code)
-        print("Case COde::", case_code_obj_list)
+                            case_code_obj_list.extend(case_code)
+
         if case_code_obj_list:
             cases_reffered = set()
-            for case in case_code_obj_list:
-                cases_reffered.add(case.case_code)
-            case.case_references.add(cases_reffered)
+            for case_code in case_code_obj_list:
+                cases_reffered.add(case_code.case_id)
+            case.case_references.add(*cases_reffered)
             case.save()
+            index += 1
+            print("Cases COmplete::", index)
             #     pass
 
 
@@ -1829,8 +1827,8 @@ def get_case_ids(case_note_ids):
     )[:4]
 
 
-def get_top_cases(research, query):
-    co = cohere.Client(api_key=os.getenv("COHERE_API"))
+def get_top_cases(research):
+    # co = cohere.Client(api_key=os.getenv("COHERE_API"))
     openai.api_key = os.getenv("OPEN_AI")
     reseach_embed = openai.embeddings.create(
         input=[research], model="text-embedding-3-large"
@@ -1843,24 +1841,32 @@ def get_top_cases(research, query):
             )
         )
         .order_by("case_note_score")
-        .values("id", "short_text")[:1000]
+        .order_by("case__id")
+        .distinct("case__id")
+        .values_list("case__id", flat=True)[:5]
     )
-    dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
-    documents = [doc["short_text"] for doc in case_notes]
-    results = rerank_documents(query, documents, co)
+    # case_notes = (
+    #     case_notes.order_by("case")
+    #     .distinct("case")
+    #     .values_list("case__id", flat=True)[:5]
+    # )
+    # print("Prints Values::", case_notes)
+    # dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
+    # documents = [doc["short_text"] for doc in case_notes]
+    # results = rerank_documents(query, documents, co)
     # for i in results.results:
     #     print("TEXT::",i.document.text)
     #     print("INDEX::", i.index)
     # print("SCORE::", i.relevance_score)
-    case_note_text_list = [doc.index for doc in results.results]
+    # case_note_text_list = [doc.index for doc in results.results]
     # print("Index list::", case_note_text_list)
-    case_note_ids = [
-        dict_value[index] for index in case_note_text_list if index in dict_value
-    ]
+    # case_note_ids = [
+    #     dict_value[index] for index in case_note_text_list if index in dict_value
+    # ]
     # print("Final List::", case_note_ids)
-    return get_case_ids(case_note_ids)
+    # return get_case_ids(case_notes)
 
-    # return case_ids
+    return case_notes
 
 
 def get_research_and_query(value):
@@ -1880,7 +1886,7 @@ from .models import Case, CaseCode
 def insert_case_codes():
     with transaction.atomic():
         # Fetch all cases
-        CaseCode.objects.all().delete()
+        # CaseCode.objects.all().delete()
         cases = Case.objects.all()
 
         # Create a list to hold all CaseCode instances
@@ -1900,3 +1906,152 @@ def insert_case_codes():
 
 
 # Call the function to perform the insert operation
+# def case_file_generation():
+
+#     cases = Case.objects.all().prefetch_related(
+#         "paragraph",
+#         Prefetch(
+#             "case_note",
+#             queryset=CaseNote.objects.prefetch_related("paragraph"),
+#             to_attr="case_notes_query",
+#         ),
+#         Prefetch(
+#             "referring_cases",
+#             queryset=Case.objects.prefetch_related(
+#                 Prefetch(
+#                     "case_note",
+#                     queryset=CaseNote.objects.prefetch_related("paragraph"),
+#                     to_attr="case_referred_case_note_query",
+#                 )
+#             ),
+#             to_attr="case_referred_query",  # Changed from "case_reffered_query"
+#         ),
+#     )
+
+#     for case in cases:
+#         print("Case id::", case.__dict__)
+#         case_note_para = set()
+#         citation_paragraphs = set()
+#         file_text = ""
+#         for case_note in case.case_notes_query:
+#             file_text += case_note.short_text
+#             for para in case_note.paragraph.all():
+#                 case_note_para.add(para.para_count)
+#         for item in case.citations:
+#             if item["paragraph"] is not None:
+#                 citation_paragraphs.update(item["paragraph"])
+#         combined_set = list(case_note_para.union(citation_paragraphs))
+#         paragraphs = Caseparagraph.objects.filter(
+#             case=case, para_count__in=combined_set
+#         )
+#         for para in paragraphs:
+#             file_text += para.text
+#         # now for case_reffered
+#         case_note_para = set()
+#         citation_paragraphs = set()
+#         for case_reffered in case.case_references.all():
+#             for case_note in case_reffered.case_notes:
+#                 file_text += case_note.short_text
+#                 for para in case_note.paragraph.all():
+#                     case_note_para.add(para.para_count)
+#             for item in case.citations:
+#                 if item["paragraph"] is not None:
+#                     citation_paragraphs.update(item["paragraph"])
+#             combined_set = list(case_note_para.union(citation_paragraphs))
+#             paragraphs = Caseparagraph.objects.filter(
+#                 case=case_reffered, para_count__in=combined_set
+#             )
+#             for para in paragraphs:
+#                 file_text += para.text
+#         for (
+#             case_value
+#         ) in case.case_referred_query:  # Changed from "case_reffered_query"
+#             # print("Lovely Days:", case_value)
+#             for case_note in case_value.case_referred_case_note_query:
+#                 file_text += case_note.short_text
+
+
+def case_file_generation():
+    # Ensure the output directory exists
+    output_dir = "case_files"
+    os.makedirs(output_dir, exist_ok=True)
+
+    cases = Case.objects.all().prefetch_related(
+        "paragraph",
+        Prefetch(
+            "case_note",
+            queryset=CaseNote.objects.prefetch_related("paragraph"),
+            to_attr="case_notes_query",
+        ),
+        Prefetch(
+            "referring_cases",
+            queryset=Case.objects.prefetch_related(
+                Prefetch(
+                    "case_note",
+                    queryset=CaseNote.objects.prefetch_related("paragraph"),
+                    to_attr="case_referred_case_note_query",
+                )
+            ),
+            to_attr="case_referred_query",
+        ),
+    )
+
+    for case in cases:
+        print(f"Processing Case id: {case.id}")
+        file_text = ""
+        case_note_para = set()
+        citation_paragraphs = set()
+
+        for case_note in case.case_notes_query:
+            file_text += case_note.short_text
+            for para in case_note.paragraph.all():
+                case_note_para.add(para.para_count)
+
+        for item in case.citations:
+            if item["paragraph"] is not None:
+                citation_paragraphs.update(item["paragraph"])
+
+        combined_set = list(case_note_para.union(citation_paragraphs))
+        paragraphs = Caseparagraph.objects.filter(
+            case=case, para_count__in=combined_set
+        )
+
+        for para in paragraphs:
+            file_text += para.text
+
+        # Process referred cases
+        for case_referred in case.case_references.all():
+            case_note_para = set()
+            citation_paragraphs = set()
+
+            for case_note in case_referred.case_note.all():
+                file_text += case_note.short_text
+                for para in case_note.paragraph.all():
+                    case_note_para.add(para.para_count)
+
+            for item in case.citations:
+                if item["paragraph"] is not None:
+                    citation_paragraphs.update(item["paragraph"])
+
+            combined_set = list(case_note_para.union(citation_paragraphs))
+            paragraphs = Caseparagraph.objects.filter(
+                case=case_referred, para_count__in=combined_set
+            )
+
+            for para in paragraphs:
+                file_text += para.text
+
+        for case_value in case.case_referred_query:
+            print(f"Processing referred case: {case_value.id}")
+            for case_note in case_value.case_referred_case_note_query:
+                file_text += case_note.short_text
+
+        # Write the file_text to a .txt file
+        filename = f"{case.id}.txt"
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(file_text)
+
+        print(f"File created: {filepath}")
+
+    print("All case files have been generated.")

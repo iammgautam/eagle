@@ -85,7 +85,7 @@ WSGI_APPLICATION = "legal_gpt.wsgi.application"
 DATABASES = {
      'default': {
          'ENGINE':"django.db.backends.postgresql",
-         'NAME': "haha",
+         'NAME': "new_2013",
          'USER': "mithilesh",
          'PASSWORD': "kela",
          'HOST':"localhost",

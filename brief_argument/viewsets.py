@@ -617,6 +617,25 @@ class CoCounselViewSets(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+    @action(detail=False, methods=["GET"])
+    def get_cocounse_value(self, request):
+        try:
+            cc_case = (
+                self.get_queryset().filter(is_completed=False).latest("created_date")
+            )
+            serializer = self.get_serializer(cc_case)
+            return Response(
+                serializer.data,
+                status=status.HTTP_200_OK,
+            )
+        except CoCounsel.DoesNotExist:
+            return Response(
+                {
+                    "result": "All task complete. Please wait and reload after sometime for new task"
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
     @action(detail=True, methods=["PUT"])
     def step_1(self, request, pk=None):
         cc_case_obj = self.get_object()
@@ -641,6 +660,27 @@ class CoCounselViewSets(viewsets.ModelViewSet):
             )
         )
 
+    @action(detail=True, methods=["PUT"])
+    def get_case_ids(self, request, pk=None):
+        cc_case_obj = self.get_object()
+        top_cases = get_top_cases(request.data.get("step_1_op"))
+        cases_data = Case.objects.filter(id__in=top_cases)
+        cases_serialized_data = CaseSerializer(cases_data, many=True).data
+        data = {
+            "research_analysis": request.data.get("step_1_op"),
+            "case_ids_list": f"{cases_serialized_data}",
+        }
+        serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Convert the UUIDs to strings (if they're not already) and append .txt
+        case_id_strings = [f"{str(uuid)}.txt" for uuid in top_cases]
+        # Format the string
+        formatted_case_ids = ' '.join(f'"{uuid}"' for uuid in case_id_strings)
+        print(formatted_case_ids)
+        return Response(formatted_case_ids, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["GET"])
     def get_step_2(self, request, pk=None):
         cc_case_obj = self.get_object()
@@ -650,12 +690,14 @@ class CoCounselViewSets(viewsets.ModelViewSet):
         )
         render_case = []
         for case in top_cases:
-            render_case.append({
-                "id": case["case__id"],
-                "code": case["case__code"],
-            })
+            render_case.append(
+                {
+                    "id": case["case__id"],
+                    "code": case["case__code"],
+                }
+            )
         print("RENDERSER::", render_case)
-        case_ids = [str(item['case__id']) for item in top_cases]
+        case_ids = [str(item["case__id"]) for item in top_cases]
         data = {
             "case_ids_list": f"{render_case}",
         }
