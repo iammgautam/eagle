@@ -621,7 +621,7 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     def get_cocounse_value(self, request):
         try:
             cc_case = (
-                self.get_queryset().filter(is_completed=False).latest("created_date")
+                self.get_queryset().filter(is_completed=False).earliest("created_date")
             )
             serializer = self.get_serializer(cc_case)
             return Response(

@@ -1828,7 +1828,6 @@ def get_case_ids(case_note_ids):
 
 
 def get_top_cases(research):
-    # co = cohere.Client(api_key=os.getenv("COHERE_API"))
     openai.api_key = os.getenv("OPEN_AI")
     reseach_embed = openai.embeddings.create(
         input=[research], model="text-embedding-3-large"
@@ -1845,27 +1844,6 @@ def get_top_cases(research):
         .distinct("case__id")
         .values_list("case__id", flat=True)[:5]
     )
-    # case_notes = (
-    #     case_notes.order_by("case")
-    #     .distinct("case")
-    #     .values_list("case__id", flat=True)[:5]
-    # )
-    # print("Prints Values::", case_notes)
-    # dict_value = {index: case["id"] for index, case in enumerate(case_notes)}
-    # documents = [doc["short_text"] for doc in case_notes]
-    # results = rerank_documents(query, documents, co)
-    # for i in results.results:
-    #     print("TEXT::",i.document.text)
-    #     print("INDEX::", i.index)
-    # print("SCORE::", i.relevance_score)
-    # case_note_text_list = [doc.index for doc in results.results]
-    # print("Index list::", case_note_text_list)
-    # case_note_ids = [
-    #     dict_value[index] for index in case_note_text_list if index in dict_value
-    # ]
-    # print("Final List::", case_note_ids)
-    # return get_case_ids(case_notes)
-
     return case_notes
 
 

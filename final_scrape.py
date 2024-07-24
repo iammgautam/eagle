@@ -337,7 +337,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
 
         memo_url = f"http://localhost:8000/api/cocounsel/{memo["id"]}/"
         memo['citations'] = remaining
-
+        memo['is_completed'] = True
         # Prepare the headers for the request
         headers = {
             'Content-Type': 'application/json',
@@ -355,7 +355,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
         #     print(f"Couldn't scrape content from converted page: {e}")
 
         # Keep the browser open for manual inspection
-        input("Press Enter to close the browser...")
+        # input("Press Enter to close the browser...")
 
     except Exception as e:
         print(f"An error occurred: {e}")
