@@ -19,6 +19,7 @@ from rest_framework import viewsets
 from pgvector.django import CosineDistance
 
 from brief_argument.scraper2 import run_playwright
+from brief_argument.viewsets import search_view
 from .models import (
     Argument,
     Case,
@@ -294,6 +295,16 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
+    run_playwright()
+    # print(
+    #     "CSE NOTES::",
+    #     Case.objects.annotate(
+    #         paragraph_count=Count("paragraph"), case_note_count=Count("case_note")
+    #     )
+    #     .filter(paragraph_count__gte=20, case_note_count=0)
+    #     .count(),
+    # )
+    # search_view()
     # case_file_generation()
     # step2_setup())
     # insert_case_codes()
@@ -674,6 +685,7 @@ def cocounsel_worker_1(request):
         "csrf_token": csrf_token,
     }
     return render(request, "brief_argument/cc_worker_1.html", context)
+
 
 def cocounsel_worker_2(request, cc_case_id):
     csrf_token = get_token(request)

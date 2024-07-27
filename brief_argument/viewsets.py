@@ -3,7 +3,8 @@ import os
 import re
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q, Count
+from django.db.models.functions import Coalesce
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -23,6 +24,7 @@ from .models import (
     Caseparagraph,
     CoCounsel,
 )
+from brief_argument.models import default_embeddings
 from case_history.models import LegalSearchHistory
 from case_history.models import CaseHistory
 from .serializers import (
@@ -447,6 +449,149 @@ class CaseViewsets(viewsets.ModelViewSet):
         return Response({"result": result}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
+    def lexplore_search(self, request):
+        openai.api_key = os.getenv("OPEN_AI")
+        search_text = request.data.get("search_text")
+        text_embedding = openai.embeddings.create(
+            input=[search_text], model="text-embedding-3-large"
+        )
+
+        case_notes = (
+            CaseNote.objects.annotate(
+                case_note_score=CosineDistance(
+                    "embeddings", text_embedding.data[0].embedding
+                )
+            )
+            .order_by("case_note_score")[:4]
+            .prefetch_related(
+                Prefetch(
+                    "case",
+                    queryset=Case.objects.all().prefetch_related(
+                        Prefetch(
+                            "case_references",
+                            queryset=Case.objects.all(),
+                            to_attr="case_references_query",
+                        ),
+                        Prefetch(
+                            "referring_cases",
+                            queryset=Case.objects.all(),
+                            to_attr="referring_cases_query",
+                        ),
+                    ),
+                    to_attr="case_query",
+                ),
+            )
+        )
+        # case_value_notes = Case.objects.all().annotate(case_count_value = Count("case_note"), total_word_count=Sum('paragraph__text')).order_by("-case_count_value")
+        # case_with_most_notes = Case.objects.annotate(
+        #     note_count=Coalesce(Count('case_note'), 0)
+        # ).order_by('-note_count').first()
+        # from django.db.models import Prefetch
+
+        # Assuming Caseparagraph has a ForeignKey to Case
+        # case_main = Case.objects.prefetch_related(
+        #     Prefetch(
+        #         "case_note",
+        #         queryset=CaseNote.objects.all(),
+        #         to_attr="paragraphs_query",
+        #     )
+        # )
+
+        # case_result = []
+
+        # for case in case_main:
+        #     total_word_count = sum(len(paragraph.short_text.split()) for paragraph in case.paragraphs_query)
+        #     if total_word_count > 0:  # Only include cases with a word count greater than 0
+        #         case_result.append({
+        #             "case_id": case.id,
+        #             "words_count": total_word_count
+        #         })
+        # case_result.sort(key=lambda x: x['words_count'])
+        # # Get the lowest 10 cases
+        # lowest_10_cases = case_result[:10]
+        # highest_10_case = case_result[0:10]
+        # print("Lowest 10 cases based on word count:")
+        # for case in lowest_10_cases:
+        #     print(f"{case}")
+        #     print()
+        # print("Highest 10 cases based on word count:")
+        # for case in highest_10_case:
+        #     print(f"{case}")
+        #     print()
+
+        # Find the highest and lowest word counts
+        # highest_word_count = max(case_result, key=lambda x: x["words_count"])
+        # lowest_word_count = min(case_result, key=lambda x: x["words_count"])
+
+        # print(f"Highest word count: {highest_word_count}")
+        # print(f"Lowest word count: {lowest_word_count}")
+
+        # print("CASE::", case_with_most_notes.note_count)
+        threshold_score = case_notes[3].case_note_score
+        print("Threshold ::", threshold_score)
+        text_case_note_value = ""
+        alpha_cases = set()
+        for case_note in case_notes:
+            text_case_note_value += f"{search_text}{case_note}"
+            original_case = case_note.case_query
+            # get the case id of the current case_note
+            alpha_cases.add(original_case.id)
+            alpha_cases.update(ref.id for ref in original_case.case_references_query)
+            alpha_cases.update(ref.id for ref in original_case.referring_cases_query)
+        print("ALpha Cases::", alpha_cases)
+        case_count = Case.objects.filter(id__in=list(alpha_cases)).annotate(
+            case_count_value=Count("case_note")
+        )
+        for case in case_count:
+            print(f"Case id::{case.id} ---- CaseCount Value {case.case_count_value}")
+        text_case_note_value += f"{search_text}"
+
+        text_embedding = openai.embeddings.create(
+            input=[text_case_note_value], model="text-embedding-3-large"
+        )
+        case_scores = {case: 0 for case in alpha_cases}
+        selected_para_ids = {case: [] for case in alpha_cases}
+        paragraph = (
+            Caseparagraph.objects.filter(
+                Q(case__in=list(alpha_cases)), ~Q(embeddings=default_embeddings)
+            )
+            .annotate(
+                para_score=CosineDistance(
+                    "embeddings", text_embedding.data[0].embedding
+                )
+            )
+            .order_by("para_score")
+        )
+        for para in paragraph:
+            case_id = para.case.id
+            # print('Case Idd::', case_id)
+            selected_para_ids[case_id].append(para.id)
+            if case_scores[case_id] < 500:
+                case_scores[case_id] += para.text.count(" ")
+            if len([score for score in case_scores.values() if score > 100]) >= 4:
+                break
+
+        beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:4]
+        print("Beta cases::", beta_cases)
+        # print("Selected para::", selected_para_ids)
+        for i, v in selected_para_ids.items():
+            print(f"selected para list::{i}---{v}")
+            print()
+        result = []
+        for case_id, _ in beta_cases:
+            highlighted_para = []
+            print("HMMM::", selected_para_ids[case_id])
+            print()
+            for para_id in selected_para_ids[case_id]:
+                para = paragraph.get(id=para_id)
+                if para.para_score < threshold_score:
+                    print("Para Score::::", para.para_score)
+                    highlighted_para.append(para_id)
+            result.append({"case_id": case_id, "highlighted_para": highlighted_para})
+
+        return Response({"result": result}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
     def case_search_1(self, request):
         openai.api_key = os.getenv("OPEN_AI")
         search_text = request.data.get("search_text")
@@ -677,7 +822,7 @@ class CoCounselViewSets(viewsets.ModelViewSet):
         # Convert the UUIDs to strings (if they're not already) and append .txt
         case_id_strings = [f"{str(uuid)}.txt" for uuid in top_cases]
         # Format the string
-        formatted_case_ids = ' '.join(f'"{uuid}"' for uuid in case_id_strings)
+        formatted_case_ids = " ".join(f'"{uuid}"' for uuid in case_id_strings)
         print(formatted_case_ids)
         return Response(formatted_case_ids, status=status.HTTP_200_OK)
 
@@ -763,3 +908,196 @@ class CoCounselViewSets(viewsets.ModelViewSet):
             input_list.append({f"input_{index}": paragraph_text})
 
         return input_list
+
+
+def final_function(text):
+    openai.api_key = os.getenv("OPEN_AI")
+    text_embedding = openai.embeddings.create(
+        input=[text], model="text-embedding-3-large"
+    )
+
+    case_notes = (
+        CaseNote.objects.annotate(
+            case_note_score=CosineDistance(
+                "embeddings", text_embedding.data[0].embedding
+            )
+        )
+        .order_by("case_note_score")[:10]
+        .prefetch_related(
+            Prefetch(
+                "case",
+                queryset=Case.objects.all().prefetch_related(
+                    Prefetch(
+                        "case_references",
+                        queryset=Case.objects.all(),
+                        to_attr="case_references_query",
+                    ),
+                    Prefetch(
+                        "referring_cases",
+                        queryset=Case.objects.all(),
+                        to_attr="referring_cases_query",
+                    ),
+                ),
+                to_attr="case_query",
+            ),
+        )
+    )
+    threshold_score = case_notes.first().case_note_score
+    text_case_note_value = ""
+    alpha_cases = set()
+    for case_note in case_notes:
+        text_case_note_value += f"{text}{case_note}"
+        original_case = case_note.case_query
+        # get the case id of the current case_note
+        alpha_cases.add(original_case.id)
+        # get the forward case referenced
+        for forward_case_reference in original_case.case_references_query:
+            alpha_cases.update(forward_case_reference.id)
+        # get the reverse case referenced
+        for reverse_case_reference in original_case.referring_cases_query:
+            alpha_cases.update(reverse_case_reference.id)
+    text_case_note_value += f"{text}"
+
+    text_embedding = openai.embeddings.create(
+        input=[text_case_note_value], model="text-embedding-3-large"
+    )
+    case_scores = {case.id: 0 for case in alpha_cases}
+    selected_para_ids = {case.id: [] for case in alpha_cases}
+    paragraph = (
+        Caseparagraph.object.filter(
+            Q(case__in=list(alpha_cases)), ~Q(embeddings=default_embeddings)
+        )
+        .annotate(
+            para_score=CosineDistance("embeddings", text_embedding.data[0].embedding)
+        )
+        .order_by("para_score")
+    )
+    for para in paragraph:
+        case_id = para.case.id
+        selected_para_ids[case_id].append(para.id)
+        if case_scores[case_id] < 500:
+            case_scores[case_id] += para.text.count(" ")
+        if len([score for score in case_scores.values() if score > 500]) >= 10:
+            break
+
+    beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+    highlighted_para = []
+    result = []
+    for case_id, _ in beta_cases:
+        for para_id in selected_para_ids[case_id]:
+            para = paragraph.get(id=para_id)
+            if para.para_score < threshold_score:
+                highlighted_para.append(para_id)
+        result.append({"case_id": case_id, "highlighted_para": highlighted_para})
+
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import Case, Caseparagraph, CaseNote
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+import openai
+from django.db.models import Prefetch
+
+openai.api_key = "your_openai_api_key"
+
+
+def get_embedding(text):
+    try:
+        response = openai.Embedding.create(input=text, model="text-embedding-003")
+        return np.array(response["data"][0]["embedding"])
+    except Exception as e:
+        print(f"Error fetching embedding: {e}")
+        return np.zeros(3072)  # Return a zero vector if there's an error
+
+
+def search_cases(query):
+    try:
+        query_embedding = get_embedding(query)
+
+        casenotes = CaseNote.objects.prefetch_related(
+            Prefetch("paragraph", to_attr="cached_paragraphs")
+        ).all()
+
+        similarities = []
+        for casenote in casenotes:
+            casenote_embedding = np.array(casenote.embeddings)
+            similarity = cosine_similarity([query_embedding], [casenote_embedding])[0][
+                0
+            ]
+            similarities.append((casenote, similarity))
+
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        top_casenotes = [casenote for casenote, _ in similarities[:10]]
+
+        # Collecting the alpha cases
+        alpha_cases = set()
+        for casenote in top_casenotes:
+            alpha_cases.add(casenote.case)
+            referred_cases = casenote.case.case_references.all()
+            referring_cases = casenote.case.referring_cases.all()
+            alpha_cases.update(referred_cases)
+            alpha_cases.update(referring_cases)
+
+        alpha_paragraphs = Caseparagraph.objects.filter(
+            case__in=alpha_cases
+        ).select_related("case")
+
+        text2 = query + " " + " ".join([cn.short_text for cn in top_casenotes])
+        text2_embedding = get_embedding(text2)
+
+        case_scores = {case.id: 0 for case in alpha_cases}
+        paragraphs_embeddings = [
+            (p.case.id, np.array(p.embeddings)) for p in alpha_paragraphs
+        ]
+
+        similarities = [
+            (case_id, cosine_similarity([text2_embedding], [emb])[0][0])
+            for case_id, emb in paragraphs_embeddings
+        ]
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        for case_id, similarity in similarities:
+            if case_scores[case_id] < 500:
+                case_scores[case_id] += len(paragraphs_embeddings[case_id][1])
+            if len([score for score in case_scores.values() if score > 500]) >= 10:
+                break
+
+        beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        highlighted_paragraphs = []
+        for case_id, _ in beta_cases:
+            paragraphs = Caseparagraph.objects.filter(case_id=case_id)
+            for paragraph in paragraphs:
+                paragraph_embedding = np.array(paragraph.embeddings)
+                similarity = cosine_similarity(
+                    [text2_embedding], [paragraph_embedding]
+                )[0][0]
+                if similarity > max(similarities, key=lambda x: x[1])[1]:
+                    highlighted_paragraphs.append((case_id, paragraph.text))
+
+        return beta_cases, highlighted_paragraphs
+
+    except Exception as e:
+        print(f"Error in search_cases: {e}")
+        return [], []
+
+
+def search_view():
+    try:
+        query = "Text"
+        if not query:
+            return JsonResponse({"error": "Query parameter is required"}, status=400)
+
+        beta_cases, highlighted_paragraphs = search_cases(query)
+        response_data = {
+            "beta_cases": [case_id.title for case_id, _ in beta_cases],
+            "highlighted_paragraphs": [p for _, p in highlighted_paragraphs],
+        }
+        return JsonResponse(response_data)
+
+    except Exception as e:
+        print(f"Error in search_view: {e}")
+        return JsonResponse(
+            {"error": "An error occurred while processing your request"}, status=500
+        )

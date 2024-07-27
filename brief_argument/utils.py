@@ -1954,7 +1954,7 @@ def case_file_generation():
     output_dir = "case_files"
     os.makedirs(output_dir, exist_ok=True)
 
-    cases = Case.objects.all().prefetch_related(
+    cases = Case.objects.filter(id='a9c08545-1747-46f7-9b5e-6d38b65e7822').prefetch_related(
         "paragraph",
         Prefetch(
             "case_note",
@@ -1976,34 +1976,40 @@ def case_file_generation():
 
     for case in cases:
         print(f"Processing Case id: {case.id}")
-        file_text = ""
+        file_text = f"<{case.petitioner} v. {case.respondent} in the {case.court}\n>"
         case_note_para = set()
         citation_paragraphs = set()
 
         for case_note in case.case_notes_query:
-            file_text += case_note.short_text
+            file_text += f"{case_note.short_text}\n"
             for para in case_note.paragraph.all():
                 case_note_para.add(para.para_count)
 
         for item in case.citations:
             if item["paragraph"] is not None:
                 citation_paragraphs.update(item["paragraph"])
-
+            print("CITATION VALUESS:", citation_paragraphs)
         combined_set = list(case_note_para.union(citation_paragraphs))
+        print("Combined SET::", combined_set)
         paragraphs = Caseparagraph.objects.filter(
             case=case, para_count__in=combined_set
         )
+        print("Paragraph ::", paragraphs)
 
         for para in paragraphs:
-            file_text += para.text
+            file_text += f"{para.text}\n"
+
+        file_text += f"</{case.petitioner} v. {case.respondent} in the {case.court}\n\n\n>"
 
         # Process referred cases
+        file_text += "<Cites>"
         for case_referred in case.case_references.all():
+            file_text += f"<{case_referred.petitioner} v. {case_referred.respondent} in the {case_referred.court}\n>"
             case_note_para = set()
             citation_paragraphs = set()
 
             for case_note in case_referred.case_note.all():
-                file_text += case_note.short_text
+                file_text += f"{case_note.short_text}\n"
                 for para in case_note.paragraph.all():
                     case_note_para.add(para.para_count)
 
@@ -2017,12 +2023,19 @@ def case_file_generation():
             )
 
             for para in paragraphs:
-                file_text += para.text
+                file_text += f"{para.text}\n"
 
+            file_text += f"</{case_referred.petitioner} v. {case_referred.respondent} in the {case_referred.court}\n\n\n>"
+        file_text += "<Cites>"
+
+        file_text += "<Cited By>"
         for case_value in case.case_referred_query:
-            print(f"Processing referred case: {case_value.id}")
+            print("ULTA CAASE::", case_value.id)
+            file_text += f"<{case_value.petitioner} v. {case_value.respondent} in the {case_value.court}\n>"
             for case_note in case_value.case_referred_case_note_query:
-                file_text += case_note.short_text
+                file_text += f"{case_note.short_text}\n"
+            file_text += f"</{case_value.petitioner} v. {case_value.respondent} in the {case_value.court}\n\n\n>"
+        file_text += "</Cited By>"
 
         # Write the file_text to a .txt file
         filename = f"{case.id}.txt"
