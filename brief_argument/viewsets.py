@@ -42,6 +42,7 @@ from .serializers import (
     CoCounselSerializers,
 )
 from .utils import (
+    final_cocounsel,
     get_research_and_query,
     get_sof_and_question,
     get_step4_output_formatter,
@@ -462,7 +463,7 @@ class CaseViewsets(viewsets.ModelViewSet):
                     "embeddings", text_embedding.data[0].embedding
                 )
             )
-            .order_by("case_note_score")[:4]
+            .order_by("case_note_score")[:23]
             .prefetch_related(
                 Prefetch(
                     "case",
@@ -527,7 +528,7 @@ class CaseViewsets(viewsets.ModelViewSet):
         # print(f"Lowest word count: {lowest_word_count}")
 
         # print("CASE::", case_with_most_notes.note_count)
-        threshold_score = case_notes[3].case_note_score
+        threshold_score = case_notes[22].case_note_score
         print("Threshold ::", threshold_score)
         text_case_note_value = ""
         alpha_cases = set()
@@ -568,10 +569,10 @@ class CaseViewsets(viewsets.ModelViewSet):
             selected_para_ids[case_id].append(para.id)
             if case_scores[case_id] < 500:
                 case_scores[case_id] += para.text.count(" ")
-            if len([score for score in case_scores.values() if score > 100]) >= 4:
+            if len([score for score in case_scores.values() if score > 98]) >= 23:
                 break
 
-        beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:4]
+        beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:23]
         print("Beta cases::", beta_cases)
         # print("Selected para::", selected_para_ids)
         for i, v in selected_para_ids.items():
@@ -808,7 +809,7 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     @action(detail=True, methods=["PUT"])
     def get_case_ids(self, request, pk=None):
         cc_case_obj = self.get_object()
-        top_cases = get_top_cases(request.data.get("step_1_op"))
+        top_cases = final_cocounsel(request.data.get("step_1_op"))
         cases_data = Case.objects.filter(id__in=top_cases)
         cases_serialized_data = CaseSerializer(cases_data, many=True).data
         data = {
@@ -823,7 +824,7 @@ class CoCounselViewSets(viewsets.ModelViewSet):
         case_id_strings = [f"{str(uuid)}.txt" for uuid in top_cases]
         # Format the string
         formatted_case_ids = " ".join(f'"{uuid}"' for uuid in case_id_strings)
-        print(formatted_case_ids)
+        # print(formatted_case_ids)
         return Response(formatted_case_ids, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"])

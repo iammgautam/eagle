@@ -140,6 +140,14 @@ def login(page, credentials, max_retries=3):
             except Exception as e:
                 logging.info("Extra Login Popup not Found.")
 
+            try:
+                if page.url == "https://www.aironline.in/AuthenticateUser.html":
+                    logging.info("AuthenticateUser page detected. Going to login page.")
+                    credentials = get_random_credentials()
+                    login(page, credentials)
+            except Exception as e:
+                logging.info("Another Opps! Error not found.")
+
             # Check if login was successful
             if page.url != "https://www.aironline.in/login.html":
                 logging.info(f"Login successful with {credentials['username']}")
@@ -433,7 +441,7 @@ def scrape_case(new_page):
     )
 
 
-def run(playwright, start_index=670, max_restarts=10, start_year=2006, end_year=1950):
+def run(playwright, start_index=1, max_restarts=10, start_year=2006, end_year=1950):
     current_year = start_year
     while current_year >= end_year:
         restart_count = 0
@@ -451,6 +459,7 @@ def run(playwright, start_index=670, max_restarts=10, start_year=2006, end_year=
                     raise Exception("Navigation failed")
                 time.sleep(10)
                 nodes = page.query_selector_all("#CitationTree .data .fullContent")
+                # print("Node::", len(nodes))
                 for node_index in range(start_index, len(nodes)):
                     node = nodes[node_index]
 
@@ -482,9 +491,10 @@ def run(playwright, start_index=670, max_restarts=10, start_year=2006, end_year=
                 logging.info(
                     f"All cases processed successfully for year {current_year}"
                 )
-                current_year -= 1
-                start_index = 1  # Reset start_index for the new year
-                break  # Break out of the restart loop
+                if start_index == len(nodes):
+                    current_year -= 1
+                    start_index = 1  # Reset start_index for the new year
+                    break  # Break out of the restart loop
 
             except Exception as e:
                 logging.error(f"An error occurred: {str(e)}")

@@ -11,7 +11,7 @@ from openai import OpenAI
 import lxml.etree
 from django.template.loader import render_to_string
 from django.db.models.functions import Cast
-from django.db.models import Q, Prefetch, FloatField, F
+from django.db.models import Q, Prefetch, FloatField, F, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail.backends.smtp import EmailBackend
 from legal_gpt import settings
@@ -1844,6 +1844,7 @@ def get_top_cases(research):
         .distinct("case__id")
         .values_list("case__id", flat=True)[:5]
     )
+    
     return case_notes
 
 
@@ -2046,3 +2047,100 @@ def case_file_generation():
         print(f"File created: {filepath}")
 
     print("All case files have been generated.")
+
+
+def final_cocounsel(search_text):
+    openai.api_key = os.getenv("OPEN_AI")
+    text_embedding = openai.embeddings.create(
+        input=[search_text], model="text-embedding-3-large"
+    )
+
+    case_notes = (
+        CaseNote.objects.annotate(
+            case_note_score=CosineDistance(
+                "embeddings", text_embedding.data[0].embedding
+            )
+        )
+        .order_by("case_note_score")[:4]
+        .prefetch_related(
+            Prefetch(
+                "case",
+                queryset=Case.objects.all().prefetch_related(
+                    Prefetch(
+                        "case_references",
+                        queryset=Case.objects.all(),
+                        to_attr="case_references_query",
+                    ),
+                    Prefetch(
+                        "referring_cases",
+                        queryset=Case.objects.all(),
+                        to_attr="referring_cases_query",
+                    ),
+                ),
+                to_attr="case_query",
+            ),
+        )
+    )
+    threshold_score = case_notes[3].case_note_score
+    # print("Threshold ::", threshold_score)
+    text_case_note_value = ""
+    alpha_cases = set()
+    for case_note in case_notes:
+        text_case_note_value += f"{search_text}{case_note}"
+        original_case = case_note.case_query
+        # get the case id of the current case_note
+        alpha_cases.add(original_case.id)
+        alpha_cases.update(ref.id for ref in original_case.case_references_query)
+        alpha_cases.update(ref.id for ref in original_case.referring_cases_query)
+    # print("ALpha Cases::", alpha_cases)
+    case_count = Case.objects.filter(id__in=list(alpha_cases)).annotate(
+        case_count_value=Count("case_note")
+    )
+    # for case in case_count:
+    #     print(f"Case id::{case.id} ---- CaseCount Value {case.case_count_value}")
+    text_case_note_value += f"{search_text}"
+
+    text_embedding = openai.embeddings.create(
+        input=[text_case_note_value], model="text-embedding-3-large"
+    )
+    case_scores = {case: 0 for case in alpha_cases}
+    selected_para_ids = {case: [] for case in alpha_cases}
+    paragraph = (
+        Caseparagraph.objects.filter(
+            Q(case__in=list(alpha_cases)), ~Q(embeddings=default_embeddings)
+        )
+        .annotate(
+            para_score=CosineDistance(
+                "embeddings", text_embedding.data[0].embedding
+            )
+        )
+        .order_by("para_score")
+    )
+    for para in paragraph:
+        case_id = para.case.id
+        # print('Case Idd::', case_id)
+        selected_para_ids[case_id].append(para.id)
+        if case_scores[case_id] < 500:
+            case_scores[case_id] += para.text.count(" ")
+        if len([score for score in case_scores.values() if score > 4355]) >= 4:
+            break
+
+    beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:4]
+
+    return beta_cases
+    # print("Beta cases::", beta_cases)
+    # print("Selected para::", selected_para_ids)
+    # for i, v in selected_para_ids.items():
+    #     print(f"selected para list::{i}---{v}")
+    #     print()
+    result = []
+    for case_id, _ in beta_cases:
+        highlighted_para = []
+        # print("HMMM::", selected_para_ids[case_id])
+        print()
+        for para_id in selected_para_ids[case_id]:
+            para = paragraph.get(id=para_id)
+            if para.para_score < threshold_score:
+                # print("Para Score::::", para.para_score)
+                highlighted_para.append(para_id)
+        result.append({"case_id": case_id, "highlighted_para": highlighted_para})
