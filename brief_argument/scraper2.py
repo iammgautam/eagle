@@ -20,11 +20,12 @@ logging.basicConfig(
 credentials_list = [
     {"username": "rith005", "password": "Rith@005"},
     {"username": "jishnu008", "password": "Jishnu@008"},
-    {"username": "paul008", "password": "Jishnu@008"},
-    {"username": "nunu008", "password": "Nunu@008"},
-    {"username": "gautam008", "password": "Gautam@008"},
-    {"username": "mithilesh008", "password": "Mithilesh@008"},
+    # {"username": "paul008", "password": "Jishnu@008"},
+    # {"username": "nunu008", "password": "Nunu@008"},
+    # {"username": "gautam008", "password": "Gautam@008"},
+    # {"username": "mithilesh008", "password": "Mithilesh@008"},
 ]
+
 
 @sync_to_async
 def save_in_db(case_info, paragraph_list, case_notes_list):
@@ -130,7 +131,7 @@ def login(page, credentials, max_retries=3):
             page.click("#submitButton_Id")
 
             # Wait for navigation to complete
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("networkidle", timeout=0)
             # time.sleep(5)
             # Check for logout modal
             try:
@@ -180,26 +181,7 @@ def navigate_to_cases(page, year, max_retries=3):
             try:
                 page.click(selector)
                 logging.info(f"Selected {selector} going for next selector")
-                page.wait_for_load_state("networkidle", timeout=wait_time)
-                # Check for "Permission Denied" message
-                if page.locator("text=Permission Denied").is_visible():
-                    logging.info(
-                        "Permission Denied message detected. Attempting to click 'Back to Homepage'"
-                    )
-                    try:
-                        page.click("text=Back to Homepage")
-                        page.wait_for_load_state(
-                            "networkidle", timeout=10000
-                        )  # Wait for 10 seconds after clicking
-                        logging.info(
-                            "Clicked 'Back to Homepage'. Retrying navigation from the beginning."
-                        )
-                        return navigate_to_cases(
-                            page, max_retries
-                        )  # Restart navigation
-                    except Exception as e:
-                        logging.error(f"Failed to click 'Back to Homepage': {str(e)}")
-                        return False
+                page.wait_for_load_state("networkidle", timeout=0)
                 break
             except PlaywrightTimeoutError:
                 if attempt == max_retries - 1:
@@ -441,6 +423,33 @@ def scrape_case(new_page):
     )
 
 
+def check_for_max_usage_error(page):
+    try:
+        error_message = page.locator("p.couponErrorMessage")
+        # expect(error_message).to_contain_text("You Exceed Maximum Usage", timeout=0)
+        if error_message.is_visible():
+            # If the error message is found, attempt to click the logout button
+            logout_button = page.locator("#userLogoutBtn_Id")
+            if logout_button.is_visible():
+                logout_button.click()
+                page.wait_for_load_state("networkidle", timeout=0)
+                logging.info(
+                    "Clicked logout button after detecting maximum usage error."
+                )
+                return True
+            else:
+                logging.warning(
+                    "Logout button not found after detecting maximum usage error."
+                )
+                return False
+
+    except Exception as e:
+        logging.debug(f"No maximum usage error detected: {str(e)}")
+        return False
+    except:
+        return False
+
+
 def run(playwright, start_index=1, max_restarts=10, start_year=2006, end_year=1950):
     current_year = start_year
     while current_year >= end_year:
@@ -459,28 +468,46 @@ def run(playwright, start_index=1, max_restarts=10, start_year=2006, end_year=19
                     raise Exception("Navigation failed")
                 time.sleep(10)
                 nodes = page.query_selector_all("#CitationTree .data .fullContent")
-                # print("Node::", len(nodes))
-                for node_index in range(start_index, len(nodes)):
+
+                # Adjust the starting index to be 0-based
+                adjusted_start_index = start_index - 1 if start_index > 0 else 0
+
+                for node_index in range(adjusted_start_index, len(nodes)):
                     node = nodes[node_index]
 
                     with page.expect_popup() as popup_info:
                         node.click()
                     new_page = popup_info.value
 
-                    new_page.wait_for_load_state("networkidle", timeout=60000)
+                    new_page.wait_for_load_state("networkidle", timeout=0)
 
-                    case_info, paragraph_list, case_notes_list = scrape_case(new_page)
+                    if check_for_max_usage_error(new_page):
+                        new_page.close()
+                        if "browser" in locals():
+                            browser.close()
+
+                    try:
+                        case_info, paragraph_list, case_notes_list = scrape_case(
+                            new_page
+                        )
+                    except Exception as e:
+                        # time.sleep(30)
+                        new_page.close()
+                        start_index = node_index + 1
+                        case_name = case_info["code"]
+                        logging.info(f"SKIPPING CASE No. {start_index}---{case_name}")
+
                     if case_info is None:
                         logging.warning(
                             f"Failed to scrape case at index {node_index}. Skipping..."
                         )
                         continue
 
-                    with ThreadPoolExecutor() as executor:
-                        executor.submit(
-                            asyncio.run,
-                            save_in_db(case_info, paragraph_list, case_notes_list),
-                        )
+                    # with ThreadPoolExecutor() as executor:
+                    #     executor.submit(
+                    #         asyncio.run,
+                    #         save_in_db(case_info, paragraph_list, case_notes_list),
+                    #     )
 
                     new_page.close()
                     start_index = node_index + 1
@@ -521,5 +548,5 @@ def run_playwright():
         run(playwright)
 
 
-# if __name__ == "__main__":
-#     run_playwright()
+if __name__ == "__main__":
+    run_playwright()

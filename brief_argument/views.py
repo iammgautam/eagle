@@ -295,22 +295,22 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
-    case_notes = Case.objects.get(id='1464afd8-d3f8-43e5-b42d-519c3a7be02b')
-    print("case:", case_notes.referring_cases.all().values_list("code"))
-    result = []
-    for i in case_notes:
-        total_word_count = len(i.short_text.split())
-        result.append({
-            "case_note": i,
-            "count": total_word_count,
-        })
+    # case_notes = Case.objects.get(id='1464afd8-d3f8-43e5-b42d-519c3a7be02b')
+    # print("case:", case_notes.referring_cases.all().values_list("code"))
+    # result = []
+    # for i in case_notes:
+    #     total_word_count = len(i.short_text.split())
+    #     result.append({
+    #         "case_note": i,
+    #         "count": total_word_count,
+    #     })
     
-    # Find the highest and lowest word counts
-    highest_word_count = max(result, key=lambda x: x["count"])
-    lowest_word_count = min(result, key=lambda x: x["count"])
+    # # Find the highest and lowest word counts
+    # highest_word_count = max(result, key=lambda x: x["count"])
+    # lowest_word_count = min(result, key=lambda x: x["count"])
 
-    print(f"Highest word count: {highest_word_count}")
-    print(f"Lowest word count: {lowest_word_count}")
+    # print(f"Highest word count: {highest_word_count}")
+    # print(f"Lowest word count: {lowest_word_count}")
 
     # run_playwright()
     # print(
