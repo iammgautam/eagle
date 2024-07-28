@@ -20,10 +20,10 @@ logging.basicConfig(
 credentials_list = [
     {"username": "rith005", "password": "Rith@005"},
     {"username": "jishnu008", "password": "Jishnu@008"},
-    # {"username": "paul008", "password": "Jishnu@008"},
-    # {"username": "nunu008", "password": "Nunu@008"},
-    # {"username": "gautam008", "password": "Gautam@008"},
-    # {"username": "mithilesh008", "password": "Mithilesh@008"},
+    {"username": "paul008", "password": "Jishnu@008"},
+    {"username": "nunu008", "password": "Nunu@008"},
+    {"username": "gautam008", "password": "Gautam@008"},
+    {"username": "mithilesh008", "password": "Mithilesh@008"},
 ]
 
 
