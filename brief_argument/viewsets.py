@@ -352,7 +352,7 @@ class CaseViewsets(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
-    def case_search(self, request):
+    def lexplore_search(self, request):
         openai.api_key = os.getenv("OPEN_AI")
         search_text = request.data.get("search_text")
         search_text_embeddings = openai.embeddings.create(
@@ -450,7 +450,7 @@ class CaseViewsets(viewsets.ModelViewSet):
         return Response({"result": result}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
-    def lexplore_search(self, request):
+    def case_search(self, request):
         openai.api_key = os.getenv("OPEN_AI")
         search_text = request.data.get("search_text")
         text_embedding = openai.embeddings.create(
@@ -483,53 +483,9 @@ class CaseViewsets(viewsets.ModelViewSet):
                 ),
             )
         )
-        # case_value_notes = Case.objects.all().annotate(case_count_value = Count("case_note"), total_word_count=Sum('paragraph__text')).order_by("-case_count_value")
-        # case_with_most_notes = Case.objects.annotate(
-        #     note_count=Coalesce(Count('case_note'), 0)
-        # ).order_by('-note_count').first()
-        # from django.db.models import Prefetch
 
-        # Assuming Caseparagraph has a ForeignKey to Case
-        # case_main = Case.objects.prefetch_related(
-        #     Prefetch(
-        #         "case_note",
-        #         queryset=CaseNote.objects.all(),
-        #         to_attr="paragraphs_query",
-        #     )
-        # )
-
-        # case_result = []
-
-        # for case in case_main:
-        #     total_word_count = sum(len(paragraph.short_text.split()) for paragraph in case.paragraphs_query)
-        #     if total_word_count > 0:  # Only include cases with a word count greater than 0
-        #         case_result.append({
-        #             "case_id": case.id,
-        #             "words_count": total_word_count
-        #         })
-        # case_result.sort(key=lambda x: x['words_count'])
-        # # Get the lowest 10 cases
-        # lowest_10_cases = case_result[:10]
-        # highest_10_case = case_result[0:10]
-        # print("Lowest 10 cases based on word count:")
-        # for case in lowest_10_cases:
-        #     print(f"{case}")
-        #     print()
-        # print("Highest 10 cases based on word count:")
-        # for case in highest_10_case:
-        #     print(f"{case}")
-        #     print()
-
-        # Find the highest and lowest word counts
-        # highest_word_count = max(case_result, key=lambda x: x["words_count"])
-        # lowest_word_count = min(case_result, key=lambda x: x["words_count"])
-
-        # print(f"Highest word count: {highest_word_count}")
-        # print(f"Lowest word count: {lowest_word_count}")
-
-        # print("CASE::", case_with_most_notes.note_count)
         threshold_score = case_notes[22].case_note_score
-        print("Threshold ::", threshold_score)
+        # print("Threshold ::", threshold_score)
         text_case_note_value = ""
         alpha_cases = set()
         for case_note in case_notes:
@@ -539,12 +495,12 @@ class CaseViewsets(viewsets.ModelViewSet):
             alpha_cases.add(original_case.id)
             alpha_cases.update(ref.id for ref in original_case.case_references_query)
             alpha_cases.update(ref.id for ref in original_case.referring_cases_query)
-        print("ALpha Cases::", alpha_cases)
-        case_count = Case.objects.filter(id__in=list(alpha_cases)).annotate(
-            case_count_value=Count("case_note")
-        )
-        for case in case_count:
-            print(f"Case id::{case.id} ---- CaseCount Value {case.case_count_value}")
+        # print("ALpha Cases::", alpha_cases)
+        # case_count = Case.objects.filter(id__in=list(alpha_cases)).annotate(
+        #     case_count_value=Count("case_note")
+        # )
+        # for case in case_count:
+        #     print(f"Case id::{case.id} ---- CaseCount Value {case.case_count_value}")
         text_case_note_value += f"{search_text}"
 
         text_embedding = openai.embeddings.create(
@@ -573,20 +529,20 @@ class CaseViewsets(viewsets.ModelViewSet):
                 break
 
         beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:23]
-        print("Beta cases::", beta_cases)
+        # print("Beta cases::", beta_cases)
         # print("Selected para::", selected_para_ids)
-        for i, v in selected_para_ids.items():
-            print(f"selected para list::{i}---{v}")
-            print()
+        # for i, v in selected_para_ids.items():
+        #     print(f"selected para list::{i}---{v}")
+        #     print()
         result = []
         for case_id, _ in beta_cases:
             highlighted_para = []
-            print("HMMM::", selected_para_ids[case_id])
-            print()
+            # print("HMMM::", selected_para_ids[case_id])
+            # print()
             for para_id in selected_para_ids[case_id]:
                 para = paragraph.get(id=para_id)
                 if para.para_score < threshold_score:
-                    print("Para Score::::", para.para_score)
+                    # print("Para Score::::", para.para_score)
                     highlighted_para.append(para_id)
             result.append({"case_id": case_id, "highlighted_para": highlighted_para})
 

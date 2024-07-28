@@ -144,8 +144,10 @@ def login(page, credentials, max_retries=3):
             try:
                 if page.url == "https://www.aironline.in/AuthenticateUser.html":
                     logging.info("AuthenticateUser page detected. Going to login page.")
-                    credentials = get_random_credentials()
-                    login(page, credentials)
+                    if "browser" in locals():
+                        page.close()
+                    # credentials = get_random_credentials()
+                    # login(page, credentials)
             except Exception as e:
                 logging.info("Another Opps! Error not found.")
 
