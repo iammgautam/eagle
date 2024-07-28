@@ -2126,8 +2126,10 @@ def final_cocounsel(search_text):
             break
 
     beta_cases = sorted(case_scores.items(), key=lambda x: x[1], reverse=True)[:4]
-
-    return beta_cases
+    uuid_list = [case[0] for case in beta_cases]
+    # print("List of UUIDs:", uuid_list)
+    # print("BETA Cases::", beta_cases)
+    return uuid_list
     # print("Beta cases::", beta_cases)
     # print("Selected para::", selected_para_ids)
     # for i, v in selected_para_ids.items():
