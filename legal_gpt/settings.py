@@ -22,6 +22,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -47,6 +62,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "legal_gpt.middleware.IPLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "legal_gpt.urls"
