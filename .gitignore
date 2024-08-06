@@ -166,3 +166,5 @@ db_dump.sql
 # Ignore Django migration files
 # brief_argument/migrations/*
 # case_history/migrations/*
+static/admin/*
+static/rest_framework/*

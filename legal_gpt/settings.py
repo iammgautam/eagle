@@ -14,8 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = os.getenv("DEBUG")
 
-ALLOWED_HOSTS = ['localhost']
-# ALLOWED_HOSTS = ['35.154.64.164']
+ALLOWED_HOSTS = ['localhost', '128.199.29.198']
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
@@ -99,16 +98,15 @@ WSGI_APPLICATION = "legal_gpt.wsgi.application"
 #     }
 # }
 DATABASES = {
-     'default': {
-         'ENGINE':"django.db.backends.postgresql",
-         'NAME': "new_2013",
-         'USER': "mithilesh",
-         'PASSWORD': "kela",
-         'HOST':"localhost",
-         'PORT': "5432",
-     }
+    'default': {
+        'ENGINE':"django.db.backends.postgresql",
+        'NAME': "new_2013",
+        'USER': "mithilesh",
+        'PASSWORD': "kela",
+        'HOST':"localhost",
+        'PORT': "5432",
+    }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -144,10 +142,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

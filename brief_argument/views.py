@@ -2,7 +2,7 @@ import re
 import os
 import json
 import openai
-from django.db.models import Func, Value, FloatField, Count, Max, TextField, Prefetch
+from django.db.models import Prefetch
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, Sum
 from django.db.models.functions import Cast
@@ -19,7 +19,6 @@ from rest_framework import viewsets
 from pgvector.django import CosineDistance
 
 from brief_argument.scraper2 import run_playwright
-from brief_argument.viewsets import search_view
 from .models import (
     Argument,
     Case,
@@ -295,6 +294,7 @@ class RelevantCitationsPassageViewsets(viewsets.ModelViewSet):
 
 
 def main_page(request):
+    # send_aib_mail()
     # case_notes = Case.objects.get(id='1464afd8-d3f8-43e5-b42d-519c3a7be02b')
     # print("case:", case_notes.referring_cases.all().values_list("code"))
     # result = []

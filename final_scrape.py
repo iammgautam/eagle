@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 import time
 import pyautogui  # You'll need to install this: pip install pyautogui
+import traceback
 
 ORIGINAL_PROFILE = os.path.expanduser(
     "'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -33,7 +34,7 @@ def input_section(driver, section_name):
     time.sleep(10)
 
 
-def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
+def automated_login_with_profile(memo, step_1_input, step_1_folder_path, step_2_input):
     options = Options()
     options.add_argument(f"user-data-dir={COPY_PROFILE}")
     options.add_argument("profile-directory=Default")
@@ -50,27 +51,19 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
 
     # Wait for manual login
     time.sleep(2)
-    # Wait for the search box to be present and interactable
     search_box = WebDriverWait(driver, 30).until(
-        EC.element_to_be_clickable(
-            (
-                By.XPATH,
-                "/html/body/div/main/div/div/div[2]/div/div/div/div[1]/div[2]/div/div/div[2]/span/div/div/div[1]/textarea",
-            )
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "textarea[placeholder='Ask anything...']")
         )
     )
     search_box.clear()
     search_box.send_keys(Keys.TAB)
 
-    attach_button = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable(
-            (
-                By.XPATH,
-                "/html/body/div/main/div/div/div[2]/div/div/div/div[1]/div[2]/div/div/div[2]/span/div/div/div[2]/div[2]/button/div",
-            )
-        )
-    )
-    driver.execute_script("arguments[0].click();", attach_button)
+    wait = WebDriverWait(driver, 10)
+    button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[.//div[contains(text(), 'Attach')]]")))
+
+    # Click the button
+    button.click()
     print("Clicked attach button")
 
     # Wait for the file dialog to appear
@@ -83,11 +76,11 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     # Navigate to the directory
     pyautogui.write(file_path)
     pyautogui.press("enter")
-    time.sleep(1)  # Wait for directory to open
+    time.sleep(5)  # Wait for directory to open
 
     # Type the file name
     pyautogui.write(file_name)
-    time.sleep(1)
+    time.sleep(5)
 
     # Press Enter to select the file
     pyautogui.press("enter")
@@ -97,12 +90,13 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     # Enter text in the search box
     search_box.clear()
     search_box.send_keys(step_1_input)
+    time.sleep(30)
     search_box.send_keys(Keys.TAB)
     print("Entered search text")
     # search_box.send_keys(Keys.ESCAPE)
 
     # Wait for a few seconds to allow the file to be processed
-    time.sleep(1)
+    time.sleep(50)
 
     # Click the go button
     go_button = WebDriverWait(driver, 20).until(
@@ -112,7 +106,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     print("Clicked go button")
 
     # Wait for the answer to generate (adjust time as needed)
-    time.sleep(20)
+    time.sleep(60)
 
     # Attempt to scrape the first answer
     # Wait for the main div to be present
@@ -124,7 +118,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     # Extract the main text
     all_text = main_div.text
 
-    memo_url = f"http://13.200.242.60:8000/api/cocounsel/{memo['id']}/get_case_ids/"
+    memo_url = f"http://128.199.29.198/api/cocounsel/{memo['id']}/get_case_ids/"
 
     data_to_send = {
         "step_1_op": all_text,
@@ -141,40 +135,29 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     
     time.sleep(5)
 
-    # Follow-up query
-    follow_up_box = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located(
-            (
-                By.XPATH,
-                "/html/body/div/main/div/div/div[2]/div/div/div[2]/div[1]/div/div/div[2]/div/div/div/div/span/div/div/div[1]/textarea",
-            )
-        )
-    )
+    follow_up_box = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "textarea[placeholder='Ask follow-up']")))
 
-    time.sleep(2)
+    # Click on the textarea
+    follow_up_box.click()
 
-    driver.execute_script("arguments[0].scrollIntoView(true);", follow_up_box)
-    time.sleep(2)
-
+    # Enter text
     follow_up_box.clear()
-    follow_up_box.send_keys("Brief Fact + Legal Issue")
+    follow_up_box.send_keys(step_2_input)
+    follow_up_box.send_keys(Keys.ENTER)
 
-    # Find and click the attach button for follow-up
-    # try:
-    attach_button = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable(
-            (
-                By.XPATH,
-                "/html/body/div/main/div/div/div[2]/div/div/div[2]/div[1]/div/div/div[2]/div/div/div/div/span/div/div/div[2]/div/button/div",
-            )
-        )
-    )
-    driver.execute_script("arguments[0].click();", attach_button)
+
+    time.sleep(2)
+
+    # element = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "svg.svg-inline--fa.fa-circle-plus.fa-fw.fa-lg")))
+
+    # # Find the closest clickable parent (usually a button)
+    # clickable_element = element.find_element(By.XPATH, "./ancestor::button")
+
+    # # Click the element
+    # clickable_element.click()
+
+
     print("Clicked attach button for follow-up")
-    # except Exception as e:
-    #     print(f"Failed to click attach button: {e}")
-
-    # Wait for the file dialog to appear
     time.sleep(1)
 
     # File path and name (same as before)
@@ -236,18 +219,6 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
     for section in sections:
         input_section(driver, section)
 
-    # Attempt to scrape the content of the converted page
-    # try:
-    # page_content = WebDriverWait(driver, 30).until(
-    #     EC.presence_of_element_located(
-    #         (
-    #             By.XPATH,
-    #             "/html/body/div/main/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div[2]",
-    #         )
-    #     )
-    # )
-    # content_text = page_content.text
-    # Wait for the necessary elements to be loaded
     WebDriverWait(driver, 60).until(
         EC.presence_of_element_located(
             (By.CSS_SELECTOR, "span.rounded-md.duration-150")
@@ -328,7 +299,7 @@ def automated_login_with_profile(memo, step_1_input, step_1_folder_path):
         print(i)
         print()
 
-    memo_url = f"http://13.200.242.60:8000/api/cocounsel/{memo["id"]}/"
+    memo_url = f"http://128.199.29.198/api/cocounsel/{memo["id"]}/"
     memo['citations'] = remaining
     memo['is_completed'] = True
     # Prepare the headers for the request
@@ -364,34 +335,122 @@ def create_folder(folder_path):
         print(f"Folder already exists: {folder_path}")
 
 
-if __name__ == "__main__":
-    get_case_url = "http://13.200.242.60:8000/api/cocounsel/get_cocounse_value/"
-
+def main_loop():
     while True:
-        response = requests.get(get_case_url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            step_1_input = f"{data['brief_facts']} {data['legal_issue']}"
-
-            base_path = "/Users/mithilesh/law/step_1_files"
-            step_1_folder_path = os.path.join(base_path, data["id"])
-
-            # Create folder
-            create_folder(step_1_folder_path)
-
-            # Write files
-            write_to_file(
-                os.path.join(step_1_folder_path, "case_facts.txt"), data["case_facts"]
-            )
-            write_to_file(
-                os.path.join(step_1_folder_path, "legal_research.txt"), data["legal_research"]
-            )
-
-            automated_login_with_profile(data, step_1_input, step_1_folder_path)
+        try:
+            get_case_url = "http://128.199.29.198/api/cocounsel/get_cocounse_value/"
+            response = requests.get(get_case_url)
             
-            print("Processing complete. Immediately polling API again.")
-            # The loop will continue immediately to the next iteration
-        else:
-            print(f"API call failed with status code {response.status_code}. Retrying in 60 seconds.")
-            time.sleep(60)  # Wait for 60 seconds before the next attempt
+            if response.status_code == 200:
+                data = response.json()
+                step_1_input = f"{data['brief_facts']} {data['legal_issue']}"
+
+                base_path = "/Users/mithilesh/law/step_1_files"
+                step_1_folder_path = os.path.join(base_path, data["id"])
+
+                # Create folder
+                create_folder(step_1_folder_path)
+
+                # Write files
+                write_to_file(
+                    os.path.join(step_1_folder_path, "case_facts.txt"), data["case_facts"]
+                )
+                write_to_file(
+                    os.path.join(step_1_folder_path, "legal_research.txt"), data["legal_research"]
+                )
+                step_1_input = f"""{data['legal_issue']} {data['brief_facts']} {data['legal_issue']} You are a skilled legal researcher tasked with drafting the 'Discussion' section of the legal memorandum.
+
+                Conduct thorough legal research on the issue presented. 
+                Consult primary sources such as relevant statutes and case law. 
+                Identify key legal principles and precedents relevant to the legal issue.  
+                Review secondary sources for additional
+                insights. 
+                Ensure all sources remain good law.
+                Consider all relevant legal precedents, even those that may not support an initially apparent outcome. 
+
+                Draft the Discussion:
+                Begin with an introductory paragraph.
+                Provide a detailed legal analysis including:
+
+                Relevant legal precedents, statutes, and principle.
+                Critical analysis of how these apply to the case facts
+                Examination of potential counterarguments
+                Reasoned arguments supporting your conclusions
+
+                Organize your analysis into logical subsections, each addressing a specific aspect of the legal issue.
+                Present a balanced analysis that considers all relevant legal precedents, even those that may not support your conclusion.
+
+                Use clear, concise language appropriate for a legally sophisticated audience.
+                Employ an active voice and avoid ambiguities or redundancies.
+                Use headings and subheadings to enhance readability.
+                Cite all sources accurately.
+                Maintain an objective, impartial tone throughout the memorandum.
+                Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+                Remember your ethical duty to represent the law accurately and honestly. 
+                Do not misrepresent or selectively cite authorities. 
+                Include all relevant case law, even if it doesn't support the desired outcome.
+
+                Your goal is to provide an comprehensive, objective, well-researched, and professionally written legal analysis that will inform and guide senior attorneys in their decision-making process. Ensure that your memorandum demonstrates the highest standards of professional integrity throughout the research and writing process. {data['legal_issue']}"""
+
+                step_2_input = f"""{data['legal_issue']} You are a skilled legal researcher tasked with drafting the 'Discussion' section of the legal memorandum.
+
+                Conduct thorough legal research on the issue presented. 
+                Consult primary sources such as relevant statutes and case law. 
+                Identify key legal principles and precedents relevant to the legal issue.  
+                Review secondary sources for additional
+                insights. 
+                Ensure all sources remain good law.
+                Consider all relevant legal precedents, even those that may not support an initially apparent outcome. 
+
+                Draft the Discussion:
+                Begin with an introductory paragraph.
+                Provide a detailed legal analysis including:
+
+                Relevant legal precedents, statutes, and principle.
+                Critical analysis of how these apply to the case facts
+                Examination of potential counterarguments
+                Reasoned arguments supporting your conclusions
+
+                Organize your analysis into logical subsections, each addressing a specific aspect of the legal issue.
+                Present a balanced analysis that considers all relevant legal precedents, even those that may not support your conclusion.
+
+                Use clear, concise language appropriate for a legally sophisticated audience.
+                Employ an active voice and avoid ambiguities or redundancies.
+                Use headings and subheadings to enhance readability.
+                Cite all sources accurately.
+                Maintain an objective, impartial tone throughout the memorandum.
+                Ensure your analysis demonstrates critical legal thinking and a deep understanding of the issue.
+
+                Remember your ethical duty to represent the law accurately and honestly. 
+                Do not misrepresent or selectively cite authorities. 
+                Include all relevant case law, even if it doesn't support the desired outcome.
+
+                Your goal is to provide an comprehensive, objective, well-researched, and professionally written legal analysis that will inform and guide senior attorneys in their decision-making process. Ensure that your memorandum demonstrates the highest standards of professional integrity throughout the research and writing process. {data['legal_issue']}"""
+
+                automated_login_with_profile(data, step_1_input, step_1_folder_path, step_2_input)
+                
+                print("Processing complete. Immediately polling API again.")
+            else:
+                print(f"API call failed with status code {response.status_code}. Retrying in 60 seconds.")
+                time.sleep(60)  # Wait for 60 seconds before the next attempt
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+            print("Traceback:")
+            print(traceback.format_exc())
+            print("Restarting the process in 5 seconds...")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    while True:
+        try:
+            main_loop()
+        except KeyboardInterrupt:
+            print("Program terminated by user.")
+            break
+        except Exception as e:
+            print(f"Critical error in main loop: {str(e)}")
+            print("Traceback:")
+            print(traceback.format_exc())
+            print("Restarting the entire program in 3 seconds...")
+            time.sleep(3)

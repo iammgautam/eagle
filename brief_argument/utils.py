@@ -678,18 +678,13 @@ def relevent_topics_input_generator(topics, aib=False):
     return topics_input_value
 
 
-def send_aib_mail(aib_answer, *args, **kwargs):
+def send_aib_mail(*args, **kwargs):
     html_content = render_to_string(
         "email/aib_email.html",
-        context={
-            "string": aib_answer,
-        },
     )
     subject = "AIB Question-Answer by Syndicus"
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [
-        # "rithikchaudhary150500@gmail.com",
-        # "jishnusai99@gmail.com",
         "iammgautam@gmail.com",
     ]
     message = EmailMultiAlternatives(
