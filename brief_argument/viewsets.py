@@ -767,12 +767,12 @@ class CoCounselViewSets(viewsets.ModelViewSet):
     def get_case_ids(self, request, pk=None):
         cc_case_obj = self.get_object()
         top_cases = final_cocounsel(request.data.get("step_1_op"))
-        # print("Top caases::", top_cases)
+        # print("Top caases::", [str(u) for u in top_cases])
         cases_data = Case.objects.filter(id__in=top_cases)
         cases_serialized_data = CaseSerializer(cases_data, many=True).data
         data = {
             "research_analysis": request.data.get("step_1_op"),
-            "case_ids_list": f"{cases_serialized_data}",
+            "case_ids_list": f"{[str(u) for u in top_cases]}",
         }
         serializer = self.get_serializer(cc_case_obj, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
